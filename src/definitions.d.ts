@@ -14,13 +14,19 @@ export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
 export type ThreadResult = Result<[Array<unknown>, (r: unknown) => unknown], string>;
 
+export type UnwrapAsyncReturnType<T extends Callback> = ReturnType<T> extends Promise<infer U>
+	? U extends Promise<any>
+		? UnwrapAsyncReturnType<() => U>
+		: U
+	: ReturnType<T>;
+
 export type NetBuilderResult<T> =
 	| {
-			Result: "OK";
+			Result: "Ok";
 			Value: T;
 	  }
 	| {
-			Result: "ERR";
+			Result: "Err";
 			Message: string;
 	  };
 

@@ -54,12 +54,7 @@ class ServerDispatcher<F extends Callback> {
 
 		if (result.isOk()) {
 			for (const plr of this.resolvePlayerList(player)) {
-				const value = result.unwrap()[0];
-
-				this.remote.FireClient(
-					plr,
-					...((Promise.is(value) ? value.await()[1] : value) as never),
-				);
+				this.remote.FireClient(plr, ...(result.unwrap()[0] as never));
 			}
 		}
 	}
@@ -71,9 +66,7 @@ class ServerDispatcher<F extends Callback> {
 		const result = MiddlewareResolver.CreateSender(this.definition, ...(args as unknown[]));
 
 		if (result.isOk()) {
-			const value = result.unwrap()[0];
-
-			this.remote.FireAllClients(...((Promise.is(value) ? value.await()[1] : value) as never));
+			this.remote.FireAllClients(...(result.unwrap()[0] as never));
 		}
 	}
 
@@ -90,7 +83,10 @@ class ServerDispatcher<F extends Callback> {
 
 	/** Connects a listener callback that is called whenever new data is received from a client. */
 	public Connect(
-		callback: (player: Player, ...args: Parameters<F>) => ReturnType<F> | Promise<ReturnType<F>>,
+		callback: (
+			player: Player,
+			...args: Parameters<F>
+		) => ReturnType<F> extends Promise<any> ? ReturnType<F> : ReturnType<F> | Promise<ReturnType<F>>,
 	) {
 		if (this.isDuplicate) return;
 

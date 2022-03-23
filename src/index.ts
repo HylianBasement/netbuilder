@@ -13,19 +13,22 @@ import RateLimiter from "./Middleware/RateLimiter";
 import Serializer from "./Middleware/Serialiazer";
 import TypeChecker from "./Middleware/TypeChecker";
 
-export { NetBuilderResult } from "./definitions";
+export { NetBuilderResult, NetBuilderMiddleware, MiddlewareCallback } from "./definitions";
 
 /* eslint-disable prettier/prettier */
 export {
+	// Builders
 	NetBuilder,
 	EventBuilder,
 	FunctionBuilder,
 	MiddlewareBuilder,
 	ServerMiddlewareBuilder,
 
+	// Dispatchers
 	Client,
 	Server,
 	
+	// Middlewares
 	Logger,
 	Mediator,
 	RateLimiter,

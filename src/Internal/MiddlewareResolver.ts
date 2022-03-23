@@ -13,6 +13,7 @@ import {
 import GlobalMiddleware from "../Symbol/GlobalMiddleware";
 
 import definitionInfo from "../Util/definitionInfo";
+import unwrapPromiseDeep from "../Util/unwrapPromiseDeep";
 
 interface MiddlewareEntry {
 	CurrentParameters: ReadonlyArray<unknown>;
@@ -35,20 +36,20 @@ namespace MiddlewareResolver {
 			const middlewares = getMiddlewares(definition);
 
 			const executeFn = (...args: unknown[]) =>
-				RunService.IsServer() ? callback(player, ...args) : callback(...args);
+				unwrapPromiseDeep(RunService.IsServer() ? callback(player, ...args) : callback(...args));
 
 			if (middlewares.size() > 0) {
 				const state = checkMiddlewares(definition, "Recv", args);
 
 				if (state.Result.isErr()) {
 					return {
-						Result: "ERR",
+						Result: "Err",
 						Message: state.Result.unwrapErr(),
 					};
 				}
 
 				return {
-					Result: "OK",
+					Result: "Ok",
 					Value: state.ReturnCallbacks.reduce(
 						(acc, fn) => fn(acc),
 						executeFn(...state.CurrentParameters),
@@ -56,7 +57,7 @@ namespace MiddlewareResolver {
 				};
 			}
 
-			return { Result: "OK", Value: executeFn(...args) };
+			return { Result: "Ok", Value: executeFn(...args) };
 		};
 	}
 

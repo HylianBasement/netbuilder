@@ -6,6 +6,7 @@ import {
 	RemoteDefinition,
 	RemoteDefinitionMembers,
 	ThreadResult,
+	UnwrapAsyncReturnType,
 } from "../definitions";
 
 import MiddlewareResolver from "../Internal/MiddlewareResolver";
@@ -16,6 +17,7 @@ import definitionInfo from "../Util/definitionInfo";
 import isRemoteFunction from "../Util/isRemoteFunction";
 import netBuilderError from "../Util/netBuilderError";
 import netBuilderWarn from "../Util/netBuilderWarn";
+import rustResult from "../Util/rustResult";
 
 const noop = () => {};
 
@@ -58,12 +60,38 @@ class ClientDispatcher<F extends Callback> {
 		return `The result from ${definitionInfo(this.definition)} is still pending.`;
 	}
 
-	public Call(...args: Parameters<F>): NetBuilderResult<ReturnType<F>> {
+	/** Calls the server synchronously. */
+	public Call(...args: Parameters<F>) {
+		return this.CallRust(...(args as never)).match((r) => r, netBuilderError);
+	}
+
+	/** Calls the server and returns a promise. */
+	public CallAsync(...args: Parameters<F>) {
+		const promise = new Promise<UnwrapAsyncReturnType<F>>((res, rej) => {
+			const result = this.CallResult(...(args as never));
+
+			if (result.Result === "Ok") {
+				res(result.Value);
+			} else {
+				rej(result.Message);
+			}
+		});
+
+		return Promise.race([
+			promise.timeout(this.timeout, this.timeoutMsg()),
+			Promise.delay(this.warningTimeout)
+				.andThenCall(netBuilderWarn, this.definition, this.warningTimeoutMsg())
+				.then(() => Promise.fromEvent({ Connect: noop })),
+		]) as Promise<UnwrapAsyncReturnType<F>>;
+	}
+
+	/** Calls the server synchronously and returns a result object containing its status and value/error message. */
+	public CallResult(...args: Parameters<F>): NetBuilderResult<UnwrapAsyncReturnType<F>> {
 		const { remote } = this;
 
 		if (!remote || !isRemoteFunction(remote))
 			return {
-				Result: "ERR",
+				Result: "Err",
 				Message: `Expected RemoteFunction, got ${remote ? "RemoteEvent" : "nil"}.`,
 			};
 
@@ -78,48 +106,33 @@ class ClientDispatcher<F extends Callback> {
 				ReturnType<F>
 			>;
 
-			if (returnResult.Result === "ERR") {
+			if (returnResult.Result === "Err") {
 				return returnResult;
 			}
 
-			const value = resultFn(returnResult.Value);
-
 			return {
-				Result: "OK",
-				Value: Promise.is(value) ? value.await()[1] : value,
-			} as NetBuilderResult<ReturnType<F>>;
+				Result: "Ok",
+				Value: resultFn(returnResult.Value),
+			} as NetBuilderResult<UnwrapAsyncReturnType<F>>;
 		}
 
 		return {
-			Result: "ERR",
+			Result: "Err",
 			Message: result.unwrapErr(),
 		};
 	}
 
-	public CallWith<R extends defined>(
-		predicate: (returnValue: NetBuilderResult<ReturnType<F>>) => R,
-		...args: Parameters<F>
-	) {
-		return predicate(this.Call(...(args as never)));
+	/** Calls the server synchronously and returns a RustResult value. */
+	public CallRust(...args: Parameters<F>) {
+		return this.CallWith(rustResult, ...(args as never));
 	}
 
-	public CallAsync(...args: Parameters<F>) {
-		const promise = new Promise<ReturnType<F>>((res, rej) => {
-			const result = this.Call(...(args as never));
-
-			if (result.Result === "OK") {
-				res(result.Value);
-			} else {
-				rej(result.Message);
-			}
-		});
-
-		return Promise.race([
-			promise.timeout(this.timeout, this.timeoutMsg()),
-			Promise.delay(this.warningTimeout)
-				.andThenCall(netBuilderWarn, this.definition, this.warningTimeoutMsg())
-				.then(() => Promise.fromEvent({ Connect: noop })),
-		]) as Promise<ReturnType<F>>;
+	/** Calls the server synchronously that returns a value transformed by its predicate function. */
+	public CallWith<R extends defined>(
+		predicate: (returnValue: NetBuilderResult<UnwrapAsyncReturnType<F>>) => R,
+		...args: Parameters<F>
+	) {
+		return predicate(this.CallResult(...(args as never)));
 	}
 
 	/** Sends a request to the server with the given arguments. */
@@ -131,14 +144,12 @@ class ClientDispatcher<F extends Callback> {
 		const result = MiddlewareResolver.CreateSender(this.definition, ...(args as unknown[]));
 
 		if (result.isOk()) {
-			const value = result.unwrap()[0];
-
-			remote.FireServer(...((Promise.is(value) ? value.await()[1] : value) as never));
+			remote.FireServer(...(result.unwrap()[0] as never));
 		}
 	}
 
 	/** Connects a listener callback that is called whenever new data is received from the server. */
-	public Connect(callback: (...args: Parameters<F>) => ReturnType<F> | Promise<ReturnType<F>>) {
+	public Connect(callback: (...args: Parameters<F>) => void | Promise<void>) {
 		const { remote } = this;
 
 		if (!remote) return;
