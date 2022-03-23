@@ -17,9 +17,18 @@
   "author": "Rimuy",
   "license": "MIT",
   "types": "out/index.d.ts",
+  "repository": {
+		"type": "git",
+		"url": "git+https://github.com/Rimuy/netbuilder.git"
+	},
+	"bugs": {
+		"url": "https://github.com/Rimuy/netbuilder/issues"
+	},
   "files": [
     "out",
-    "!out/test.lua"
+    "!out/test.lua",
+    "README.md",
+    "LICENSE"
   ],
   "publishConfig": {
     "access": "public"
