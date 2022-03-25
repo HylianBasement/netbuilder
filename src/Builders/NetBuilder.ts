@@ -5,12 +5,14 @@ import {
 	RemoteDefinition,
 	RemoteDefinitionMembers,
 	RemoteDefinitionNamespace,
+	SerializableClass,
 } from "../definitions";
 
 import Configuration from "../Symbol/Configuration";
 import GlobalMiddleware from "../Symbol/GlobalMiddleware";
 import NamespaceId from "../Symbol/NamespaceId";
 import NamespaceParent from "../Symbol/NamespaceParent";
+import Serialization from "../Symbol/Serialization";
 
 import netBuilderError from "../Util/netBuilderError";
 
@@ -23,6 +25,8 @@ class NetBuilder<R extends RemoteDefinitionNamespace = {}, O extends keyof NetBu
 	private namespaces = new Array<{ name: string; space: RemoteDefinitionNamespace }>();
 
 	private configuration: NetBuilderConfiguration = { SuppressWarnings: false };
+
+	private serializableClasses = new Map<string, SerializableClass>();
 
 	private toString() {
 		return "NetBuilder";
@@ -59,6 +63,13 @@ class NetBuilder<R extends RemoteDefinitionNamespace = {}, O extends keyof NetBu
 		return this as unknown as Omit<NetBuilder<R, O | "GlobalMiddleware">, O | "GlobalMiddleware">;
 	}
 
+	/** (De)serializes parameters and return values if they match any of the provided serializable classes. */
+	public Serialization(classes: SerializableClass[]) {
+		this.serializableClasses = new Map(classes.map((c) => [c.ClassName, c]));
+
+		return this as unknown as Omit<NetBuilder<R, O | "Serialization">, O | "Serialization">;
+	}
+
 	/** Returns a dictionary of remote definitions. */
 	public Build() {
 		const { definitions, namespaces } = this;
@@ -83,6 +94,7 @@ class NetBuilder<R extends RemoteDefinitionNamespace = {}, O extends keyof NetBu
 			space[NamespaceId] ??= name;
 			space[NamespaceParent] ??= dict;
 			space[GlobalMiddleware] ??= this.middlewareList;
+			space[Serialization] ??= this.serializableClasses;
 
 			space[Configuration] = space[Configuration]
 				? { ...this.configuration, ...(space[Configuration] as NetBuilderConfiguration) }
@@ -95,6 +107,7 @@ class NetBuilder<R extends RemoteDefinitionNamespace = {}, O extends keyof NetBu
 
 		(dict as unknown as RemoteDefinitionNamespace)[Configuration] = this.configuration;
 		(dict as unknown as RemoteDefinitionNamespace)[GlobalMiddleware] = this.middlewareList;
+		(dict as unknown as RemoteDefinitionNamespace)[Serialization] = this.serializableClasses;
 
 		return dict as unknown as R;
 	}

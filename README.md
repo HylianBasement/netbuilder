@@ -1,4 +1,7 @@
-# NetBuilder
+<div>
+	<h1><code>NetBuilder</code></h1>
+	<p>Networking library for roblox.</p>
+</div>
 
 ```js
 import { NetBuilder, EventBuilder, FunctionBuilder } from "@rbxts/netbuilder";
@@ -14,10 +17,10 @@ export = new NetBuilder()
 	)
 	.AddNamespace("Party",
 		new NetBuilder()
-			.AddDefinition(new FunctionBuilder<(info: PartyCreatorInfo) => Party>().Id("CreateParty").Build())
-			.AddDefinition(new FunctionBuilder<(partyId: number) => void>().Id("DisbandParty").Build())
+			.AddDefinition(new FunctionBuilder<(info: PartyCreatorInfo) => Party>().Id("Create").Build())
+			.AddDefinition(new FunctionBuilder<(partyId: number) => void>().Id("Disband").Build())
 			.AddDefinition(new EventBuilder<[partyId: number]>().Id("SendJoinRequest").Build())
-			.AddDefinition(new EventBuilder<[invitedPlayer: Player, partyId: number]>().Id("SendInviteToPlayer").Build())
+			.AddDefinition(new EventBuilder<[invitedPlayer: Player, partyId: number]>().Id("SendInvite").Build())
 			.Build()
 	)
 	.Build();

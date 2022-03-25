@@ -1,5 +1,5 @@
 import { Players, RunService } from "@rbxts/services";
-import { Result, Vec } from "@rbxts/rust-classes";
+import { Option, Result, Vec } from "@rbxts/rust-classes";
 
 import {
 	NetBuilderMiddleware,
@@ -7,18 +7,63 @@ import {
 	RemoteDefinitionMembers,
 	ThreadResult,
 	NetBuilderResult,
+	SerializableClassInstance,
 	Optional,
+	SerializableClass,
+	RemoteDefinitionNamespace,
 } from "../definitions";
 
 import GlobalMiddleware from "../Symbol/GlobalMiddleware";
+import Serialization from "../Symbol/Serialization";
 
 import definitionInfo from "../Util/definitionInfo";
 import unwrapPromiseDeep from "../Util/unwrapPromiseDeep";
+import netBuilderFormat from "../Util/netBuilderFormat";
+import isSerializedObject from "../Util/isSerializedObject";
 
 interface MiddlewareEntry {
 	CurrentParameters: ReadonlyArray<unknown>;
 	ReturnCallbacks: Array<(value: unknown) => unknown>;
 	Result: ThreadResult;
+}
+
+function isSerializableClassInstance(
+	namespace: RemoteDefinitionNamespace,
+	value: unknown,
+): value is SerializableClassInstance {
+	if (!typeIs(value, "table")) {
+		return false;
+	}
+
+	const mt = getmetatable(value);
+
+	if (!typeIs(mt, "table") || !("ClassName" in mt)) {
+		return false;
+	}
+
+	const serializables = namespace[Serialization] as Map<string, SerializableClass>;
+
+	return serializables.has((mt as { ClassName: string }).ClassName);
+}
+
+function serialize(namespace: RemoteDefinitionNamespace, v: defined) {
+	return isSerializableClassInstance(namespace, v)
+		? "Serialize" in v
+			? v.Serialize()
+			: v.serialize()
+		: v;
+}
+
+function deserialize(namespace: RemoteDefinitionNamespace, v: defined) {
+	const serializables = namespace[Serialization] as Map<string, SerializableClass>;
+
+	return isSerializedObject(v)
+		? Option.wrap(serializables.get(v.ClassName))
+				.andWith((s) => Option.some(s.deserialize(v.Value)))
+				.expect(
+					netBuilderFormat(`Class "${v.ClassName}" is not a registered serializable class.`),
+				)
+		: v;
 }
 
 /** @internal */
@@ -52,7 +97,11 @@ namespace MiddlewareResolver {
 					Result: "Ok",
 					Value: state.ReturnCallbacks.reduce(
 						(acc, fn) => fn(acc),
-						executeFn(...state.CurrentParameters),
+						executeFn(
+							...(state.CurrentParameters as defined[]).map((v) =>
+								deserialize(definition.Namespace, v),
+							),
+						),
 					),
 				};
 			}
@@ -69,7 +118,9 @@ namespace MiddlewareResolver {
 
 			return state.Result.and(
 				Result.ok([
-					state.CurrentParameters,
+					(state.CurrentParameters as defined[]).map((v) =>
+						serialize(definition.Namespace, v),
+					),
 					(r: unknown) => state.ReturnCallbacks.reduce((acc, fn) => fn(acc), r),
 				]),
 			);

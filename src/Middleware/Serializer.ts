@@ -40,7 +40,7 @@ type SerializerOptions<
 					Return: Dispatcher<InReturn<ReturnType<F>>, OutReturn>;
 			  };
 
-/** (De)serializes parameters and return values set in its configuration. */
+/** (De)serializes parameters and return values manually set in its configuration. */
 function Serializer<F extends Callback>(options: SerializerOptions<F>) {
 	const opt = {
 		Return: { In: (v: defined) => v, Out: (v: defined) => v },

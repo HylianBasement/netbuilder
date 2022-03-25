@@ -10,10 +10,11 @@ import Server from "./Boundary/ServerDispatcher";
 import Logger from "./Middleware/Logger";
 import Mediator from "./Middleware/Mediator";
 import RateLimiter from "./Middleware/RateLimiter";
-import Serializer from "./Middleware/Serialiazer";
+import Serializer from "./Middleware/Serializer";
 import TypeChecker from "./Middleware/TypeChecker";
 
 export { NetBuilderResult, NetBuilderMiddleware, MiddlewareCallback } from "./definitions";
+export type { Serializable } from "./definitions";
 
 /* eslint-disable prettier/prettier */
 export {

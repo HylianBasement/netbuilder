@@ -20,6 +20,27 @@ export type UnwrapAsyncReturnType<T extends Callback> = ReturnType<T> extends Pr
 		: U
 	: ReturnType<T>;
 
+export interface SerializedObject<T extends object = object> {
+	readonly ClassName: string;
+	readonly Value: T;
+}
+
+export type SerializableClassInstance =
+	| { Serialize(): SerializedObject }
+	| { serialize(): SerializedObject };
+
+export class Serializable<T extends object> {
+	public static readonly ClassName: string;
+	public static deserialize(serialized: object): SerializableClassInstance;
+	public Serialize(): SerializedObject<T>;
+}
+
+export interface SerializableClass {
+	new (...args: Array<any>): SerializableClassInstance;
+	readonly ClassName: string;
+	deserialize(serialized: object): SerializableClassInstance;
+}
+
 export type NetBuilderResult<T> =
 	| {
 			Result: "Ok";
