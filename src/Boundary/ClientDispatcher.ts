@@ -9,8 +9,8 @@ import {
 	UnwrapAsyncReturnType,
 } from "../definitions";
 
-import MiddlewareResolver from "../Internal/MiddlewareResolver";
-import RemoteResolver from "../Internal/RemoteResolver";
+import MiddlewareManager from "../Internal/MiddlewareManager";
+import RemoteManager from "../Internal/RemoteManager";
 
 import assertRemoteType from "../Util/assertRemoteType";
 import definitionInfo from "../Util/definitionInfo";
@@ -34,7 +34,7 @@ class ClientDispatcher<F extends Callback> {
 			netBuilderError("This dispatcher can be only created on the client.");
 		}
 
-		this.remote = RemoteResolver.Request<F>(definition);
+		this.remote = RemoteManager.Request<F>(definition);
 	}
 
 	/**
@@ -95,7 +95,7 @@ class ClientDispatcher<F extends Callback> {
 				Message: `Expected RemoteFunction, got ${remote ? "RemoteEvent" : "nil"}.`,
 			};
 
-		const result = MiddlewareResolver.CreateSender(
+		const result = MiddlewareManager.CreateSender(
 			this.definition,
 			...(args as unknown[]),
 		) as ThreadResult;
@@ -141,7 +141,7 @@ class ClientDispatcher<F extends Callback> {
 
 		if (!assertRemoteType("RemoteEvent", remote)) return;
 
-		const result = MiddlewareResolver.CreateSender(this.definition, ...(args as unknown[]));
+		const result = MiddlewareManager.CreateSender(this.definition, ...(args as unknown[]));
 
 		if (result.isOk()) {
 			remote.FireServer(...(result.unwrap()[0] as never));
@@ -154,7 +154,7 @@ class ClientDispatcher<F extends Callback> {
 
 		if (!remote) return;
 
-		const fn = MiddlewareResolver.CreateReceiver(this.definition, callback);
+		const fn = MiddlewareManager.CreateReceiver(this.definition, callback);
 
 		if (isRemoteFunction(remote)) {
 			remote.OnClientInvoke = fn as F;

@@ -1,8 +1,8 @@
 import { Players, RunService } from "@rbxts/services";
 import { GetRemoteDefinition, RemoteDefinition, RemoteDefinitionMembers } from "../definitions";
 
-import MiddlewareResolver from "../Internal/MiddlewareResolver";
-import RemoteResolver from "../Internal/RemoteResolver";
+import MiddlewareManager from "../Internal/MiddlewareManager";
+import RemoteManager from "../Internal/RemoteManager";
 
 import assertRemoteType from "../Util/assertRemoteType";
 import isRemoteFunction from "../Util/isRemoteFunction";
@@ -19,7 +19,7 @@ class ServerDispatcher<F extends Callback> {
 			netBuilderError("This dispatcher can be only created on the server.");
 		}
 
-		[this.remote, this.isDuplicate] = RemoteResolver.For<F>(
+		[this.remote, this.isDuplicate] = RemoteManager.For<F>(
 			definition as unknown as RemoteDefinition,
 			true,
 		);
@@ -50,7 +50,7 @@ class ServerDispatcher<F extends Callback> {
 	public Send(player: Player | Player[], ...args: Parameters<F>) {
 		if (this.isDuplicate || !assertRemoteType("RemoteEvent", this.remote)) return;
 
-		const result = MiddlewareResolver.CreateSender(this.definition, ...(args as unknown[]));
+		const result = MiddlewareManager.CreateSender(this.definition, ...(args as unknown[]));
 
 		if (result.isOk()) {
 			for (const plr of this.resolvePlayerList(player)) {
@@ -63,7 +63,7 @@ class ServerDispatcher<F extends Callback> {
 	public SendToAll(...args: Parameters<F>) {
 		if (this.isDuplicate || !assertRemoteType("RemoteEvent", this.remote)) return;
 
-		const result = MiddlewareResolver.CreateSender(this.definition, ...(args as unknown[]));
+		const result = MiddlewareManager.CreateSender(this.definition, ...(args as unknown[]));
 
 		if (result.isOk()) {
 			this.remote.FireAllClients(...(result.unwrap()[0] as never));
@@ -90,7 +90,7 @@ class ServerDispatcher<F extends Callback> {
 	) {
 		if (this.isDuplicate) return;
 
-		const fn = MiddlewareResolver.CreateReceiver(this.definition, callback);
+		const fn = MiddlewareManager.CreateReceiver(this.definition, callback);
 		const { remote } = this;
 
 		if (isRemoteFunction(remote)) {
