@@ -43,11 +43,11 @@ export interface SerializableClass {
 
 export type NetBuilderResult<T> =
 	| {
-			Result: "Ok";
+			Type: "Ok";
 			Value: T;
 	  }
 	| {
-			Result: "Err";
+			Type: "Err";
 			Message: string;
 	  };
 

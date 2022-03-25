@@ -70,7 +70,7 @@ class ClientDispatcher<F extends Callback> {
 		const promise = new Promise<UnwrapAsyncReturnType<F>>((res, rej) => {
 			const result = this.CallResult(...(args as never));
 
-			if (result.Result === "Ok") {
+			if (result.Type === "Ok") {
 				res(result.Value);
 			} else {
 				rej(result.Message);
@@ -91,7 +91,7 @@ class ClientDispatcher<F extends Callback> {
 
 		if (!remote || !isRemoteFunction(remote))
 			return {
-				Result: "Err",
+				Type: "Err",
 				Message: `Expected RemoteFunction, got ${remote ? "RemoteEvent" : "nil"}.`,
 			};
 
@@ -106,18 +106,18 @@ class ClientDispatcher<F extends Callback> {
 				ReturnType<F>
 			>;
 
-			if (returnResult.Result === "Err") {
+			if (returnResult.Type === "Err") {
 				return returnResult;
 			}
 
 			return {
-				Result: "Ok",
+				Type: "Ok",
 				Value: resultFn(returnResult.Value),
 			} as NetBuilderResult<UnwrapAsyncReturnType<F>>;
 		}
 
 		return {
-			Result: "Err",
+			Type: "Err",
 			Message: result.unwrapErr(),
 		};
 	}

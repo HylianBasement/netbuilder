@@ -45,7 +45,7 @@ namespace MiddlewareManager {
 
 				if (state.Result.isErr()) {
 					return {
-						Result: "Err",
+						Type: "Err",
 						Message: state.Result.unwrapErr(),
 					};
 				}
@@ -55,7 +55,7 @@ namespace MiddlewareManager {
 				);
 
 				return {
-					Result: "Ok",
+					Type: "Ok",
 					Value: state.ReturnCallbacks.reduce(
 						(acc, fn) => fn(acc),
 						executeFn(
@@ -68,7 +68,7 @@ namespace MiddlewareManager {
 			}
 
 			return {
-				Result: "Ok",
+				Type: "Ok",
 				Value: SerializationManager.Deserialize(definition.Namespace, executeFn(...args)),
 			};
 		};
