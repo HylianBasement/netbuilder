@@ -62,7 +62,7 @@ class ClientDispatcher<F extends Callback> {
 
 	/** Calls the server synchronously. */
 	public Call(...args: Parameters<F>) {
-		return this.CallRust(...(args as never)).match((r) => r, netBuilderError);
+		return this.CallRust(...(args as never)).unwrapOrElse((msg) => netBuilderError(msg, 4));
 	}
 
 	/** Calls the server and returns a promise. */
