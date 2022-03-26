@@ -16,6 +16,7 @@ import GlobalMiddleware from "../Symbol/GlobalMiddleware";
 
 import definitionInfo from "../Util/definitionInfo";
 import unwrapPromiseDeep from "../Util/unwrapPromiseDeep";
+import netBuilderError from "../Util/netBuilderError";
 
 interface MiddlewareEntry {
 	CurrentParameters: ReadonlyArray<unknown>;
@@ -44,9 +45,15 @@ namespace MiddlewareManager {
 				const state = checkMiddlewares(definition, "Recv", args);
 
 				if (state.Result.isErr()) {
+					const message = state.Result.unwrapErr();
+
+					if (definition.Kind === "Event") {
+						netBuilderError(message, 4);
+					}
+
 					return {
 						Type: "Err",
-						Message: state.Result.unwrapErr(),
+						Message: message,
 					};
 				}
 
@@ -96,10 +103,7 @@ namespace MiddlewareManager {
 
 		return Result.ok([
 			args,
-			(r: unknown) => {
-				print(r);
-				return SerializationManager.Serialize(definition.Namespace, r as never);
-			},
+			(r: unknown) => SerializationManager.Serialize(definition.Namespace, r as never),
 		]);
 	}
 

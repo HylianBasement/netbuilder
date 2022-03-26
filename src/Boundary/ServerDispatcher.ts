@@ -16,7 +16,7 @@ class ServerDispatcher<F extends Callback> {
 
 	private constructor(private readonly definition: RemoteDefinitionMembers) {
 		if (!RunService.IsServer()) {
-			netBuilderError("This dispatcher can be only created on the server.");
+			netBuilderError("This dispatcher can be only created on the server.", 3);
 		}
 
 		[this.remote, this.isDuplicate] = RemoteManager.For<F>(
@@ -56,7 +56,10 @@ class ServerDispatcher<F extends Callback> {
 			for (const plr of this.resolvePlayerList(player)) {
 				this.remote.FireClient(plr, ...(result.unwrap()[0] as never));
 			}
+			return;
 		}
+
+		netBuilderError(result.unwrapErr(), 3);
 	}
 
 	/** Fires a client event for all the players. */
@@ -66,8 +69,10 @@ class ServerDispatcher<F extends Callback> {
 		const result = MiddlewareManager.CreateSender(this.definition, ...(args as unknown[]));
 
 		if (result.isOk()) {
-			this.remote.FireAllClients(...(result.unwrap()[0] as never));
+			return this.remote.FireAllClients(...(result.unwrap()[0] as never));
 		}
+
+		netBuilderError(result.unwrapErr(), 3);
 	}
 
 	/** Fires a client event for all the players, except for a selected player or a specific group. */

@@ -23,7 +23,7 @@ abstract class BaseBuilder {
 
 		// eslint-disable-next-line roblox-ts/lua-truthiness
 		if (!id) {
-			netBuilderError(`You must provide a valid identifier for this ${kind}.`);
+			netBuilderError(`You must provide a valid identifier for this ${kind}.`, 4);
 		}
 	}
 }

@@ -77,7 +77,7 @@ class NetBuilder<R extends RemoteDefinitionNamespace = {}, O extends keyof NetBu
 
 		for (const { GlobalEnabled, Label } of this.middlewareList) {
 			if (!GlobalEnabled) {
-				netBuilderError(`The middleware "${Label}" is not globally enabled.`);
+				netBuilderError(`The middleware "${Label}" is not globally enabled.`, 3);
 			}
 		}
 

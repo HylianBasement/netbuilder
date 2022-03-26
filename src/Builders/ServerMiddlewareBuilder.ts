@@ -45,7 +45,7 @@ class ServerMiddlewareBuilder<I = never, O = never, X extends keyof ServerMiddle
 		const { callback } = this;
 
 		if (!callback) {
-			netBuilderError("A valid callback must be provided for the server middleware.");
+			netBuilderError("A valid callback must be provided for the server middleware.", 3);
 		}
 
 		const middlewareFn: MiddlewareCallback =

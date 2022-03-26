@@ -31,7 +31,7 @@ class ClientDispatcher<F extends Callback> {
 
 	private constructor(private readonly definition: RemoteDefinitionMembers) {
 		if (!RunService.IsClient()) {
-			netBuilderError("This dispatcher can be only created on the client.");
+			netBuilderError("This dispatcher can be only created on the client.", 3);
 		}
 
 		this.remote = RemoteManager.Request<F>(definition);
@@ -62,7 +62,7 @@ class ClientDispatcher<F extends Callback> {
 
 	/** Calls the server synchronously. */
 	public Call(...args: Parameters<F>) {
-		return this.CallRust(...(args as never)).unwrapOrElse(netBuilderError);
+		return this.CallRust(...(args as never)).match((r) => r, netBuilderError);
 	}
 
 	/** Calls the server and returns a promise. */
@@ -87,7 +87,7 @@ class ClientDispatcher<F extends Callback> {
 
 	/** Calls the server synchronously and returns a result object containing its status and value/error message. */
 	public CallResult(...args: Parameters<F>): NetBuilderResult<UnwrapAsyncReturnType<F>> {
-		const { remote } = this;
+		const { remote, definition } = this;
 
 		if (!remote || !isRemoteFunction(remote))
 			return {
@@ -96,7 +96,7 @@ class ClientDispatcher<F extends Callback> {
 			};
 
 		const result = MiddlewareManager.CreateSender(
-			this.definition,
+			definition,
 			...(args as unknown[]),
 		) as ThreadResult;
 
@@ -144,12 +144,18 @@ class ClientDispatcher<F extends Callback> {
 		const result = MiddlewareManager.CreateSender(this.definition, ...(args as unknown[]));
 
 		if (result.isOk()) {
-			remote.FireServer(...(result.unwrap()[0] as never));
+			return remote.FireServer(...(result.unwrap()[0] as never));
 		}
+
+		netBuilderError(result.unwrapErr(), 3);
 	}
 
 	/** Connects a listener callback that is called whenever new data is received from the server. */
 	public Connect(callback: (...args: Parameters<F>) => void | Promise<void>) {
+		if (this.definition.Kind === "Function") {
+			netBuilderError("Client functions are not supported!", 3);
+		}
+
 		const { remote } = this;
 
 		if (!remote) return;

@@ -29,7 +29,17 @@ export type SerializableClassInstance =
 	| { Serialize(): SerializedObject }
 	| { serialize(): SerializedObject };
 
-export class Serializable<T extends object> {
+export type Serializable<T extends object> = SerializableType & {
+	Serialize?(): SerializedObject<T>;
+	serialize?(): SerializedObject<T>;
+};
+
+export class SerializableType {
+	public static readonly ClassName: string;
+	public static deserialize(serialized: object): SerializableClassInstance;
+}
+
+export class SerializablePascal<T extends object> {
 	public static readonly ClassName: string;
 	public static deserialize(serialized: object): SerializableClassInstance;
 	public Serialize(): SerializedObject<T>;
