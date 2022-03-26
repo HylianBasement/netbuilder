@@ -16,7 +16,7 @@ import GlobalMiddleware from "../Symbol/GlobalMiddleware";
 
 import definitionInfo from "../Util/definitionInfo";
 import unwrapPromiseDeep from "../Util/unwrapPromiseDeep";
-import netBuilderError from "../Util/netBuilderError";
+import netBuilderWarn from "../Util/netBuilderWarn";
 
 interface MiddlewareEntry {
 	CurrentParameters: ReadonlyArray<unknown>;
@@ -48,7 +48,7 @@ namespace MiddlewareManager {
 					const message = state.Result.unwrapErr();
 
 					if (definition.Kind === "Event") {
-						netBuilderError(message, 4);
+						netBuilderWarn(definition, message);
 					}
 
 					return {
