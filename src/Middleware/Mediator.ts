@@ -8,10 +8,7 @@ function Mediator<P extends Array<any>>(callback: (...values: P) => ParametersAs
 		.Sender((_, processNext) => (_, ...args) => {
 			const newArgs = callback(...(args as P)) as defined[];
 
-			processNext(
-				(args as defined[]).map((arg, i) => (newArgs[i] ? newArgs[i] : arg) as defined),
-				(r) => r,
-			);
+			processNext((args as defined[]).map((arg, i) => (newArgs[i] ? newArgs[i] : arg) as defined));
 		})
 		.Build();
 }

@@ -54,7 +54,7 @@ function RateLimiter(options: RateLimiterOptions) {
 				drop(message);
 			}
 
-			processNext(args, (r) => r);
+			processNext(args);
 		})
 		.Build();
 }

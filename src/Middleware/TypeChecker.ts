@@ -21,7 +21,7 @@ function TypeChecker(...checks: NetBuilderTypeChecker[]) {
 				}
 			}
 
-			processNext(args, (r) => r);
+			processNext(args);
 		})
 		.Build();
 }

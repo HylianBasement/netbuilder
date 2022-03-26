@@ -73,7 +73,7 @@ export type NetBuilderMiddleware = Dispatcher<MiddlewareCallback, MiddlewareCall
 
 export type MiddlewareCallback = (
 	definition: RemoteDefinitionMembers,
-	process: (params: unknown[], returnValue: (value: defined) => unknown) => never,
+	process: (params: unknown[], returnValue?: (value: defined) => unknown) => never,
 	drop: (reason: string) => never,
 ) => (player: Player, ...params: unknown[]) => void;
 

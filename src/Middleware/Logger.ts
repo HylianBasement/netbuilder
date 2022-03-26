@@ -16,7 +16,7 @@ function Logger(logger: NetBuilderLogger) {
 		.Receiver(({ Id, Kind }, processNext) => (player, ...args) => {
 			task.spawn(logger, player, { Id, Kind }, ...args);
 
-			processNext(args, (r) => r);
+			processNext(args);
 		})
 		.Build();
 }
