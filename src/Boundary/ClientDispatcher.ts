@@ -1,4 +1,3 @@
-import { RunService } from "@rbxts/services";
 import {
 	GetRemoteDefinition,
 	NetBuilderResult,
@@ -19,6 +18,7 @@ import netBuilderError from "../Util/netBuilderError";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import rustResult from "../Util/rustResult";
 
+const RunService = game.GetService("RunService");
 const noop = () => {};
 
 /** Definition manager responsible for processing client events and functions. */

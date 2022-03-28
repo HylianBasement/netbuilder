@@ -1,7 +1,8 @@
-import { RunService } from "@rbxts/services";
 import { NetBuilderMiddleware, MiddlewareCallback } from "../definitions";
 
 import netBuilderError from "../Util/netBuilderError";
+
+const RunService = game.GetService("RunService");
 
 /** Builder for middlewares that only executes on the server. */
 class ServerMiddlewareBuilder<I = never, O = never, X extends keyof ServerMiddlewareBuilder = never> {

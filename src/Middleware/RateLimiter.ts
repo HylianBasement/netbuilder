@@ -1,4 +1,3 @@
-import { Players, RunService } from "@rbxts/services";
 import { HashMap } from "@rbxts/rust-classes";
 
 import { RateLimiterOptions } from "../definitions";
@@ -11,6 +10,9 @@ interface RateLimiterProperties {
 	Requests: number;
 	LastTimestamp: DateTime;
 }
+
+const RunService = game.GetService("RunService");
+const Players = game.GetService("Players");
 
 /** Limits the amount of requests that can be sent per minute. */
 function RateLimiter(options: RateLimiterOptions) {

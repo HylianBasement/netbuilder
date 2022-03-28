@@ -1,4 +1,3 @@
-import { Players, RunService } from "@rbxts/services";
 import { Result, Vec } from "@rbxts/rust-classes";
 
 import {
@@ -23,6 +22,9 @@ interface MiddlewareEntry {
 	ReturnCallbacks: Array<(value: unknown) => unknown>;
 	Result: ThreadResult;
 }
+
+const RunService = game.GetService("RunService");
+const Players = game.GetService("Players");
 
 /** @internal */
 namespace MiddlewareManager {

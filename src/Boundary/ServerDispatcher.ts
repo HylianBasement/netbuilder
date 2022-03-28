@@ -1,4 +1,3 @@
-import { Players, RunService } from "@rbxts/services";
 import { GetRemoteDefinition, RemoteDefinition, RemoteDefinitionMembers } from "../definitions";
 
 import MiddlewareManager from "../Internal/MiddlewareManager";
@@ -7,6 +6,9 @@ import RemoteManager from "../Internal/RemoteManager";
 import assertRemoteType from "../Util/assertRemoteType";
 import isRemoteFunction from "../Util/isRemoteFunction";
 import netBuilderError from "../Util/netBuilderError";
+
+const RunService = game.GetService("RunService");
+const Players = game.GetService("Players");
 
 /** Definition manager responsible for processing server events and functions. */
 class ServerDispatcher<F extends Callback> {

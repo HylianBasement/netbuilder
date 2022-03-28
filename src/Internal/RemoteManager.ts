@@ -1,4 +1,3 @@
-import { ReplicatedStorage } from "@rbxts/services";
 import { Iterator, Option } from "@rbxts/rust-classes";
 
 import {
@@ -28,6 +27,8 @@ interface Entry {
 	IsSender: boolean;
 	Tree: readonly TreeNode[];
 }
+
+const ReplicatedStorage = game.GetService("ReplicatedStorage");
 
 /** @internal */
 class RemoteManager<F extends Callback> {

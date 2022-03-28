@@ -18,12 +18,12 @@
   "license": "MIT",
   "types": "out/index.d.ts",
   "repository": {
-		"type": "git",
-		"url": "git+https://github.com/Rimuy/netbuilder.git"
-	},
-	"bugs": {
-		"url": "https://github.com/Rimuy/netbuilder/issues"
-	},
+    "type": "git",
+    "url": "git+https://github.com/Rimuy/netbuilder.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Rimuy/netbuilder/issues"
+  },
   "files": [
     "out",
     "!out/test.lua",
@@ -46,7 +46,6 @@
     "typescript": "^4.6.2"
   },
   "dependencies": {
-    "@rbxts/rust-classes": "^0.11.1",
-    "@rbxts/services": "^1.2.0"
+    "@rbxts/rust-classes": "^0.11.1"
   }
 }
