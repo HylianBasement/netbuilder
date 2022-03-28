@@ -5,7 +5,6 @@
   "main": "out/init.lua",
   "scripts": {
     "build": "rbxtsc --verbose",
-    "watch": "rbxtsc -w",
     "prepublishOnly": "npm run build"
   },
   "keywords": [
@@ -27,6 +26,7 @@
   "files": [
     "out",
     "!out/test.lua",
+    "!out/example",
     "README.md",
     "LICENSE"
   ],
