@@ -1,3 +1,3 @@
-import { RemoteKind } from "../definitions";
+import { DefinitionKind } from "../definitions";
 
-export = (kind: RemoteKind) => (kind === "Event" ? "RemoteEvent" : "RemoteFunction");
+export = (kind: DefinitionKind) => (kind === "Event" ? "RemoteEvent" : "RemoteFunction");

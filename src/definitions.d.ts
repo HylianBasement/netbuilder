@@ -1,8 +1,5 @@
 import { Result } from "@rbxts/rust-classes";
 
-import ServerDispatcher from "./Boundary/ServerDispatcher";
-import ClientDispatcher from "./Boundary/ClientDispatcher";
-
 export type ArrayLength<T extends Array<any> | ReadonlyArray<any>> = (T & { length: number })["length"];
 
 export type LengthEquals<
@@ -10,9 +7,24 @@ export type LengthEquals<
 	B extends Array<any> | ReadonlyArray<any>,
 > = ArrayLength<A> extends ArrayLength<B> ? true : false;
 
+export type Check<T> = (value: unknown) => value is T;
+
+export type Static<T> = T extends Check<infer U> ? U : never;
+
 export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
 
 export type ThreadResult = Result<[Array<unknown>, (r: unknown) => unknown], string>;
+
+export type ToFixed<T extends Array<any>, U extends Array<any> = []> = LengthEquals<T, U> extends true
+	? U
+	: ToFixed<T, [...U, T[ArrayLength<U>]]>;
+
+export type InferStrictArguments<
+	Checks extends Array<Check<any>>,
+	New extends Array<any> = [],
+> = LengthEquals<Checks, New> extends true
+	? New
+	: InferStrictArguments<Checks, [...New, Static<Checks[ArrayLength<New>]>]>;
 
 export type UnwrapAsyncReturnType<T extends Callback> = ReturnType<T> extends Promise<infer U>
 	? U extends Promise<any>
@@ -20,36 +32,46 @@ export type UnwrapAsyncReturnType<T extends Callback> = ReturnType<T> extends Pr
 		: U
 	: ReturnType<T>;
 
-export interface SerializedObject<T extends object = object> {
-	readonly ClassName: string;
-	readonly Value: T;
+export const enum SerializationType {
+	Custom,
+	Implemented,
 }
 
-export type SerializableClassInstance =
-	| { Serialize(): SerializedObject }
-	| { serialize(): SerializedObject };
+export interface SerializedObject<S extends object = object> {
+	readonly SerializationType: SerializationType;
+	readonly SerializationId: number;
+	readonly Value: S;
+}
 
-export type Serializable<T extends object> = SerializableType & {
-	Serialize?(): SerializedObject<T>;
-	serialize?(): SerializedObject<T>;
+export type SerializableClassInstance = { Serialize(): object } | { serialize(): object };
+
+export type Serializable<T extends object> = Deserialize & {
+	Serialize?(): T;
+	serialize?(): T;
 };
 
-export class SerializableType {
-	public static readonly ClassName: string;
+export class Deserialize {
 	public static deserialize(serialized: object): SerializableClassInstance;
 }
 
-export class SerializablePascal<T extends object> {
-	public static readonly ClassName: string;
-	public static deserialize(serialized: object): SerializableClassInstance;
-	public Serialize(): SerializedObject<T>;
-}
-
-export interface SerializableClass {
+export interface SerializableClass extends Deserialize {
 	new (...args: Array<any>): SerializableClassInstance;
-	readonly ClassName: string;
 	deserialize(serialized: object): SerializableClassInstance;
 }
+
+export interface SerializationMap {
+	readonly Serializables: Map<SerializableClass, number>;
+	readonly Serializers: Map<NetBuilderSerializer<defined>, number>;
+	readonly SerializerClasses: Map<object, { Serializer: NetBuilderSerializer<defined>; Id: number }>;
+}
+
+export interface NetBuilderSerializer<S extends defined> {
+	readonly Class: object;
+	Serialize(namespace: DefinitionNamespace, value: object): SerializedObject<S>;
+	Deserialize(serialized: S): object;
+}
+
+export type SerializableObject = NetBuilderSerializer<defined> | SerializableClass;
 
 export type NetBuilderResult<T> =
 	| {
@@ -66,46 +88,48 @@ export interface NetBuilderConfiguration {
 	SuppressWarnings?: boolean;
 }
 
-export type NetBuilderMiddleware = Dispatcher<MiddlewareCallback, MiddlewareCallback> & {
+export type NetBuilderMiddleware<F extends Callback = Callback> = ObjectDispatcher<
+	MiddlewareCallback<F>,
+	MiddlewareCallback<F>
+> & {
+	Id: string;
 	GlobalEnabled: boolean;
-	Label: string;
 };
 
-export type MiddlewareCallback = (
-	definition: RemoteDefinitionMembers,
-	process: (params: unknown[], returnValue?: (value: defined) => unknown) => never,
+export type MiddlewareCallback<F extends Callback> = (
+	definition: DefinitionMembers,
+	process: (params: Parameters<F>, returnValue?: (value: ReturnType<F>) => unknown) => never,
 	drop: (reason: string) => never,
-) => (player: Player, ...params: unknown[]) => void;
+) => (player: Player, ...params: Parameters<F>) => void;
 
 export type Remote<F extends Callback = Callback> = RemoteEvent<F> | RemoteFunction<F>;
 
-export type RemoteKind = "Event" | "Function";
+export type DefinitionKind = "Event" | "Function" | "AsyncFunction";
 
-export interface RemoteDefinition<
+export interface Definition<
 	I extends string = string,
-	K extends RemoteKind = RemoteKind,
+	K extends DefinitionKind = DefinitionKind,
 	D extends Callback = Callback,
 > {
 	/** @deprecated @hidden */
 	readonly _nominal_remoteDefinition: unique symbol;
 }
 
-export interface RemoteDefinitionMembers {
+export interface DefinitionMembers {
 	readonly Id: string;
-	readonly Kind: RemoteKind;
+	readonly Kind: DefinitionKind;
 	readonly Middlewares: ReadonlyArray<NetBuilderMiddleware>;
-	readonly Namespace: RemoteDefinitionNamespace;
+	readonly Checks: readonly [ReadonlyArray<Check<any>>, Check<any>];
+	readonly Namespace: DefinitionNamespace;
 }
 
-export interface RemoteDefinitionNamespace {
+export interface DefinitionNamespace {
 	[namespaceProp: symbol]: unknown;
-	[x: string]: RemoteDefinition;
+	[x: string]: Definition;
 }
-
-export type RemoteManager = ServerDispatcher<Callback> | ClientDispatcher<Callback>;
 
 export interface RateLimiterOptions {
-	readonly MaxRequestsPerMinute: number;
+	readonly MaxPerMinute: number;
 	readonly Listener?: (error: RateLimiterError) => void;
 }
 
@@ -113,24 +137,24 @@ export interface RateLimiterError {
 	readonly Executor: Player;
 	readonly Message: string;
 	readonly Requests: number;
-	readonly Definition: LoggingRemoteDefinition;
+	readonly Definition: LoggingDefinition;
 }
 
 export interface BuilderMembers {
 	id: string;
-	kind: RemoteKind;
+	kind: DefinitionKind;
 }
 
-export interface LoggingRemoteDefinition {
+export interface LoggingDefinition {
 	readonly Id: string;
-	readonly Kind: RemoteKind;
+	readonly Kind: DefinitionKind;
 }
 
-export type GetRemoteId<R> = R extends RemoteDefinition<infer I, never, never> ? I : never;
+export type InferDefinitonId<R> = R extends Definition<infer I, never, never> ? I : never;
 
-export type GetRemoteKind<R> = R extends RemoteDefinition<never, infer K, never> ? K : never;
+export type InferDefinitionKind<R> = R extends Definition<never, infer K, never> ? K : never;
 
-export type GetRemoteDefinition<R> = R extends RemoteDefinition<never, never, infer D> ? D : never;
+export type InferDefinitionTyping<R> = R extends Definition<never, never, infer D> ? D : never;
 
 export type ParametersAsReturnType<
 	P extends Array<any>,
@@ -140,7 +164,7 @@ export type ParametersAsReturnType<
 	? A
 	: ParametersAsReturnType<P, [...I, P[ArrayLength<I>] | void], A | [...I, P[ArrayLength<I>] | void]>;
 
-export interface Dispatcher<S, R> {
+export interface ObjectDispatcher<S, R> {
 	Send: S;
 	Recv: R;
 }

@@ -1,12 +1,12 @@
-import { RemoteDefinition, RemoteDefinitionMembers, NetBuilderConfiguration } from "../definitions";
+import { Definition, DefinitionMembers, NetBuilderConfiguration } from "../definitions";
 
 import Configuration from "../Symbol/Configuration";
 
 import netBuilderFormat from "./netBuilderFormat";
 
-export = (definition: RemoteDefinition | RemoteDefinitionMembers, ...params: unknown[]) => {
+export = (definition: Definition | DefinitionMembers, ...params: unknown[]) => {
 	const supressWarnings = (
-		(definition as RemoteDefinitionMembers).Namespace[Configuration] as NetBuilderConfiguration
+		(definition as DefinitionMembers).Namespace[Configuration] as NetBuilderConfiguration
 	).SuppressWarnings;
 
 	if (!supressWarnings) warn(...netBuilderFormat(...params));

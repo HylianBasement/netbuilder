@@ -1,16 +1,18 @@
-import { BuilderMembers, NetBuilderMiddleware } from "../definitions";
+import { BuilderMembers, NetBuilderMiddleware, Check } from "../definitions";
 
 import netBuilderError from "../Util/netBuilderError";
 
 abstract class BaseBuilder {
-	/** Sets the definition's identifier. */
-	public abstract Id(id: string): unknown;
-
 	/** Generates a remote definition. */
 	public abstract Build(id: string): unknown;
 
-	/** Applies all the given middleware functions to the remote definition. */
-	public abstract Middleware(middleware: NetBuilderMiddleware[]): unknown;
+	/** Applies an ordered list of type checkers for the callback parameters. */
+	public abstract SetArguments(...checks: Array<Check<any>>): unknown;
+
+	/** Applies all the given middleware functions to the definition. */
+	public abstract WithMiddleware(middleware: NetBuilderMiddleware[]): unknown;
+
+	protected parameterChecks = new Array<Check<any>>();
 
 	protected middlewareList = new Array<NetBuilderMiddleware>();
 

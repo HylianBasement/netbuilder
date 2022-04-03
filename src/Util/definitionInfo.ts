@@ -1,3 +1,3 @@
-import { RemoteDefinition, RemoteDefinitionMembers } from "../definitions";
+import { DefinitionMembers } from "../definitions";
 
-export = (definition: RemoteDefinitionMembers) => `${definition.Kind}<${definition.Id}>`;
+export = (definition: DefinitionMembers) => `${definition.Kind}<${definition.Id}>`;

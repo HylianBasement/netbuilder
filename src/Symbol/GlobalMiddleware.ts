@@ -1,8 +1,3 @@
-declare function newproxy(b: true): object;
+import createSymbol from "../Util/createSymbol";
 
-const GlobalMiddleware = newproxy(true);
-
-(getmetatable(GlobalMiddleware) as LuaMetatable<never>).__tostring = () =>
-	"NetBuilder.Global.Middleware";
-
-export = GlobalMiddleware as unknown as symbol;
+export = createSymbol("NetBuilder.GlobalMiddleware");

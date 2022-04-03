@@ -1,7 +1,3 @@
-declare function newproxy(b: true): object;
+import createSymbol from "../Util/createSymbol";
 
-const Configuration = newproxy(true);
-
-(getmetatable(Configuration) as LuaMetatable<never>).__tostring = () => "NetBuilder.Configuration";
-
-export = Configuration as unknown as symbol;
+export = createSymbol("NetBuilder.Configuration");

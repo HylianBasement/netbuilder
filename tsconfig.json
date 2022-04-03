@@ -20,5 +20,6 @@
 		"rootDir": "src",
 		"outDir": "out",
 		"declaration": true
-	}
+	},
+	"exclude": ["out", "example/**/*"]
 }

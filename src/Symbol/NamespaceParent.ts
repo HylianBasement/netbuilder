@@ -1,7 +1,3 @@
-declare function newproxy(b: true): object;
+import createSymbol from "../Util/createSymbol";
 
-const NamespaceParent = newproxy(true);
-
-(getmetatable(NamespaceParent) as LuaMetatable<never>).__tostring = () => "NetBuilder.Namespace.Parent";
-
-export = NamespaceParent as unknown as symbol;
+export = createSymbol("NetBuilder.Namespace.Parent");

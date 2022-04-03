@@ -3,19 +3,20 @@ import { Result, Vec } from "@rbxts/rust-classes";
 import {
 	NetBuilderMiddleware,
 	MiddlewareCallback,
-	RemoteDefinitionMembers,
+	DefinitionMembers,
 	ThreadResult,
 	NetBuilderResult,
 	Optional,
 } from "../definitions";
 
-import SerializationManager from "./SerializationManager";
+import Serialization from "./Serialization";
 
 import GlobalMiddleware from "../Symbol/GlobalMiddleware";
 
 import definitionInfo from "../Util/definitionInfo";
-import unwrapPromiseDeep from "../Util/unwrapPromiseDeep";
+import awaitPromiseDeep from "../Util/awaitPromiseDeep";
 import netBuilderWarn from "../Util/netBuilderWarn";
+import TypeChecking from "./TypeChecking";
 
 interface MiddlewareEntry {
 	CurrentParameters: ReadonlyArray<unknown>;
@@ -26,14 +27,16 @@ interface MiddlewareEntry {
 const RunService = game.GetService("RunService");
 const Players = game.GetService("Players");
 
+const IS_SERVER = RunService.IsServer();
+
 /** @internal */
-namespace MiddlewareManager {
+namespace Middleware {
 	export const timeout = 60;
 
-	export const timeoutMsg = `middleware processing has timed out. (${MiddlewareManager.timeout}s)`;
+	export const timeoutMsg = `middleware processing has timed out. (${Middleware.timeout}s)`;
 
 	export function CreateReceiver<F extends Callback>(
-		definition: RemoteDefinitionMembers,
+		definition: DefinitionMembers,
 		callback: F,
 	): (...args: unknown[]) => NetBuilderResult<unknown> {
 		return (...args: unknown[]) => {
@@ -41,17 +44,32 @@ namespace MiddlewareManager {
 			const middlewares = getMiddlewares(definition);
 
 			const executeFn = (...args: unknown[]) =>
-				unwrapPromiseDeep(RunService.IsServer() ? callback(player, ...args) : callback(...args));
+				awaitPromiseDeep(RunService.IsServer() ? callback(player, ...args) : callback(...args));
+
+			const [parameterChecks] = definition.Checks;
 
 			if (middlewares.size() > 0) {
-				const state = checkMiddlewares(definition, "Recv", args);
+				const state = resolveMiddlewares(definition, "Recv", args);
 
 				if (state.Result.isErr()) {
 					const message = state.Result.unwrapErr();
 
-					if (definition.Kind === "Event") {
-						netBuilderWarn(definition, message);
-					}
+					warnForEvents(definition, message);
+
+					return {
+						Type: "Err",
+						Message: message,
+					};
+				}
+
+				const newArgs = (state.CurrentParameters as defined[]).map((v) =>
+					Serialization.Deserialize(definition.Namespace, v),
+				);
+
+				const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
+
+				if (IS_SERVER && failed) {
+					warnForEvents(definition, message);
 
 					return {
 						Type: "Err",
@@ -60,68 +78,131 @@ namespace MiddlewareManager {
 				}
 
 				state.ReturnCallbacks.unshift((r) =>
-					SerializationManager.Serialize(definition.Namespace, r as never),
+					Serialization.Serialize(definition.Namespace, r as never),
 				);
+
+				const returnValue = executeFn(...newArgs);
+
+				if (definition.Kind !== "Event") {
+					const [, returnValueCheck] = definition.Checks;
+					const [failed, message] = TypeChecking.ReturnValue(returnValue, returnValueCheck);
+
+					if (IS_SERVER && failed) {
+						return {
+							Type: "Err",
+							Message: message,
+						};
+					}
+				}
 
 				return {
 					Type: "Ok",
-					Value: state.ReturnCallbacks.reduce(
-						(acc, fn) => fn(acc),
-						executeFn(
-							...(state.CurrentParameters as defined[]).map((v) =>
-								SerializationManager.Deserialize(definition.Namespace, v),
-							),
-						),
-					),
+					Value: state.ReturnCallbacks.reduce((acc, fn) => fn(acc), returnValue),
 				};
+			}
+
+			if (definition.Kind !== "Event") {
+				const [failed, message] = TypeChecking.Parameters(args, parameterChecks);
+
+				if (IS_SERVER && failed) {
+					return {
+						Type: "Err",
+						Message: message,
+					};
+				}
+			}
+
+			const returnValue = executeFn(...args);
+
+			if (definition.Kind !== "Event") {
+				const [, returnValueCheck] = definition.Checks;
+				const [failed, message] = TypeChecking.ReturnValue(returnValue, returnValueCheck);
+
+				if (IS_SERVER && failed) {
+					warnForEvents(definition, message);
+
+					return {
+						Type: "Err",
+						Message: message,
+					};
+				}
 			}
 
 			return {
 				Type: "Ok",
-				Value: SerializationManager.Deserialize(definition.Namespace, executeFn(...args)),
+				Value: Serialization.Serialize(
+					definition.Namespace,
+					Serialization.Deserialize(definition.Namespace, returnValue),
+				),
 			};
 		};
 	}
 
-	export function CreateSender(definition: RemoteDefinitionMembers, ...args: unknown[]) {
+	export function CreateSender(
+		definition: DefinitionMembers,
+		...args: unknown[]
+	): Result<[unknown[], (r: unknown) => unknown], string> {
 		const middlewares = getMiddlewares(definition);
+		const [parameterChecks] = definition.Checks;
 
 		if (middlewares.size() > 0) {
-			const state = checkMiddlewares(definition, "Send", args);
+			const state = resolveMiddlewares(definition, "Send", args);
+
+			const newArgs = (state.CurrentParameters as defined[]).map((v) =>
+				Serialization.Serialize(definition.Namespace, v),
+			);
+
+			const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
+
+			if (IS_SERVER && failed) {
+				warnForEvents(definition, message);
+
+				return Result.err(message);
+			}
 
 			state.ReturnCallbacks.unshift((r) =>
-				SerializationManager.Deserialize(definition.Namespace, r as never),
+				Serialization.Deserialize(definition.Namespace, r as never),
 			);
 
 			return state.Result.and(
 				Result.ok([
-					(state.CurrentParameters as defined[]).map((v) =>
-						SerializationManager.Serialize(definition.Namespace, v),
-					),
+					newArgs,
 					(r: unknown) => state.ReturnCallbacks.reduce((acc, fn) => fn(acc), r),
 				]),
 			);
 		}
 
+		const newArgs = (args as defined[]).map((v) => Serialization.Serialize(definition.Namespace, v));
+
+		const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
+
+		if (IS_SERVER && failed) {
+			warnForEvents(definition, message);
+
+			return Result.err(message);
+		}
+
 		return Result.ok([
-			args,
-			(r: unknown) => SerializationManager.Serialize(definition.Namespace, r as never),
+			newArgs,
+			(r: unknown) => Serialization.Deserialize(definition.Namespace, r as never),
 		]);
 	}
 
-	function getMiddlewares(definition: RemoteDefinitionMembers) {
+	function getMiddlewares(definition: DefinitionMembers) {
 		const globalMiddlewares = definition.Namespace[GlobalMiddleware] as Array<NetBuilderMiddleware>;
 
 		return Vec.fromPtr([...definition.Middlewares, ...globalMiddlewares])
-			.dedupBy(({ Label: l1 }, { Label: l2 }) => l1 === l2 && l1 !== "Unknown")
+			.dedupBy(({ Id: i1 }, { Id: i2 }) => i1 === i2 && i1 !== "Unknown")
 			.asPtr();
 	}
 
-	function checkMiddlewares(
-		definition: RemoteDefinitionMembers,
-		kind: "Send" | "Recv",
-		args: unknown[],
-	) {
+	function warnForEvents(definition: DefinitionMembers, message: string) {
+		if (definition.Kind === "Event") {
+			netBuilderWarn(definition, message);
+		}
+	}
+
+	function resolveMiddlewares(definition: DefinitionMembers, kind: "Send" | "Recv", args: unknown[]) {
 		const player = getPlayerFromArgs(...args);
 		const middlewares = getMiddlewares(definition);
 
@@ -175,7 +256,7 @@ namespace MiddlewareManager {
 		return (args as [Player]).shift()!;
 	}
 
-	function createChannel(definition: RemoteDefinitionMembers, channel: MiddlewareCallback) {
+	function createChannel(definition: DefinitionMembers, channel: MiddlewareCallback<Callback>) {
 		return Promise.resolve([
 			coroutine.create(channel),
 			coroutine.create((result: ThreadResult) => {
@@ -184,7 +265,7 @@ namespace MiddlewareManager {
 				return result;
 			}),
 			new Instance("BindableEvent"),
-			Promise.delay(MiddlewareManager.timeout).then(() => MiddlewareManager.timeoutMsg),
+			Promise.delay(Middleware.timeout).andThenReturn(Middleware.timeoutMsg),
 		] as const)
 			.then(([ch, co, bindable, timeout]) => {
 				let isDone = false;
@@ -221,11 +302,13 @@ namespace MiddlewareManager {
 			.then(
 				([ch, p, d, e]) =>
 					[
-						coroutine.resume(ch, definition, p, d)[1] as ReturnType<MiddlewareCallback>,
+						coroutine.resume(ch, definition, p, d)[1] as ReturnType<
+							MiddlewareCallback<Callback>
+						>,
 						e as Promise<ThreadResult>,
 					] as const,
 			);
 	}
 }
 
-export = MiddlewareManager;
+export = Middleware;

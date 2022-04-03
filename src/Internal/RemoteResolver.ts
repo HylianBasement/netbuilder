@@ -1,11 +1,12 @@
+// eslint-disable-next-line @typescript-eslint/triple-slash-reference
 import { Iterator, Option } from "@rbxts/rust-classes";
 
 import {
 	NetBuilderConfiguration,
 	Remote,
-	RemoteDefinition,
-	RemoteDefinitionMembers,
-	RemoteDefinitionNamespace,
+	Definition,
+	DefinitionMembers,
+	DefinitionNamespace,
 } from "../definitions";
 
 import Configuration from "../Symbol/Configuration";
@@ -15,6 +16,7 @@ import NamespaceParent from "../Symbol/NamespaceParent";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import getRemoteInstanceKind from "../Util/getRemoteInstanceKind";
 import definitionInfo from "../Util/definitionInfo";
+import netBuilderError from "../Util/netBuilderError";
 
 interface TreeNode {
 	Name: string;
@@ -22,8 +24,8 @@ interface TreeNode {
 }
 
 interface Entry {
-	Members: RemoteDefinitionMembers;
-	Manager: RemoteManager<Callback>;
+	Members: DefinitionMembers;
+	Manager: RemoteResolver<Callback>;
 	IsSender: boolean;
 	Tree: readonly TreeNode[];
 }
@@ -31,7 +33,7 @@ interface Entry {
 const ReplicatedStorage = game.GetService("ReplicatedStorage");
 
 /** @internal */
-class RemoteManager<F extends Callback> {
+class RemoteResolver<F extends Callback> {
 	private static readonly entries = new Array<Entry>();
 
 	private static defaultRootName = "NetBuilderRemotes";
@@ -69,12 +71,12 @@ class RemoteManager<F extends Callback> {
 		return tree;
 	}
 
-	private static createTree(remote: Remote, definition: RemoteDefinition) {
+	private static createTree(remote: Remote, definition: Definition) {
 		const { root } = this;
 
-		function visitNamespaces(tree: TreeNode[], namespace: RemoteDefinitionNamespace, first?: true) {
+		function visitNamespaces(tree: TreeNode[], namespace: DefinitionNamespace, first?: true) {
 			const name = namespace[NamespaceId] as string | undefined;
-			const parent = namespace[NamespaceParent] as RemoteDefinitionNamespace | undefined;
+			const parent = namespace[NamespaceParent] as DefinitionNamespace | undefined;
 
 			tree.unshift({
 				Name: name ?? root.Name,
@@ -86,7 +88,7 @@ class RemoteManager<F extends Callback> {
 			return tree;
 		}
 
-		return visitNamespaces([], (definition as unknown as RemoteDefinitionMembers).Namespace, true);
+		return visitNamespaces([], (definition as unknown as DefinitionMembers).Namespace, true);
 	}
 
 	private static createDirectory(name: string, parent: Instance) {
@@ -106,8 +108,8 @@ class RemoteManager<F extends Callback> {
 	}
 
 	// Server
-	public static For<F extends Callback>(definition: RemoteDefinition, isSender: boolean) {
-		const def = definition as unknown as RemoteDefinitionMembers;
+	public static For<F extends Callback>(definition: Definition, isSender: boolean) {
+		const def = definition as unknown as DefinitionMembers;
 		const config = def.Namespace[Configuration] as NetBuilderConfiguration;
 
 		this.unwrapRootInstance(config.RootInstance)
@@ -124,58 +126,50 @@ class RemoteManager<F extends Callback> {
 		const { entries } = this;
 		const { Id, Kind } = def;
 
-		let isDuplicate = false;
+		return Iterator.fromItems(...entries)
+			.find(({ Members, IsSender }) => Members.Id === Id && IsSender === isSender)
+			.andWith(({ Members, Manager, Tree }) => {
+				if ((Members as unknown as Definition) === definition) {
+					netBuilderError(
+						`Detected a duplicated server dispatcher of ${[
+							...Tree.map(({ Name }) => Name),
+							Id,
+						].join(".")}. A new instance will not be created.`,
+					);
+				} else {
+					netBuilderWarn(
+						definition,
+						`"${Id}" is conflicting with an existing ${getRemoteInstanceKind(
+							Kind,
+						)}.\n\nPath: ${[
+							...Tree.map(({ Name }) => Name),
+							Tree[0].Remote ? definitionInfo(def) : Id,
+						].join(" -> ")}`,
+					);
+				}
 
-		return [
-			Iterator.fromItems(...entries)
-				.find(({ Members, IsSender }) => Members.Id === Id && IsSender === isSender)
-				.andWith(({ Members, Manager, Tree }) => {
-					isDuplicate = true;
+				return Option.some(Manager);
+			})
+			.unwrapOrElse(() => {
+				const Remote = new Instance(getRemoteInstanceKind(Kind)) as Remote<F>;
+				Remote.Name = Id;
 
-					if ((Members as unknown as RemoteDefinition) === definition) {
-						netBuilderWarn(
-							definition,
-							`Detected a duplicated server dispatcher of ${[
-								...Tree.map(({ Name }) => Name),
-								Id,
-							].join(".")}. A new instance will not be created.`,
-						);
-					} else {
-						netBuilderWarn(
-							definition,
-							`"${Id}" is conflicting with an existing ${getRemoteInstanceKind(
-								Kind,
-							)}.\n\nPath: ${[
-								...Tree.map(({ Name }) => Name),
-								Tree[0].Remote ? definitionInfo(def) : Id,
-							].join(" -> ")}`,
-						);
-					}
+				const Manager = new RemoteResolver(Remote);
 
-					return Option.some(Manager);
-				})
-				.unwrapOrElse(() => {
-					const Remote = new Instance(getRemoteInstanceKind(Kind)) as Remote<F>;
-					Remote.Name = Id;
+				entries.push({
+					Tree: this.generate(this.root, this.createTree(Remote, definition)),
+					Members: definition as unknown as DefinitionMembers,
+					IsSender: isSender,
+					Manager,
+				});
 
-					const Manager = new RemoteManager(Remote);
-
-					entries.push({
-						Tree: this.generate(this.root, this.createTree(Remote, definition)),
-						Members: definition as unknown as RemoteDefinitionMembers,
-						IsSender: isSender,
-						Manager,
-					});
-
-					return Manager;
-				})
-				.GetInstance(),
-			isDuplicate,
-		] as LuaTuple<[Remote<F>, boolean]>;
+				return Manager;
+			})
+			.GetInstance() as Remote<F>;
 	}
 
 	// Client
-	public static Request<F extends Callback>(definition: RemoteDefinitionMembers) {
+	public static Request<F extends Callback>(definition: DefinitionMembers) {
 		const root = this.unwrapRootInstance(
 			(definition.Namespace[Configuration] as NetBuilderConfiguration).RootInstance,
 		) as Option<{ Name: string; Parent?: Instance }>;
@@ -205,4 +199,4 @@ class RemoteManager<F extends Callback> {
 	}
 }
 
-export = RemoteManager;
+export = RemoteResolver;

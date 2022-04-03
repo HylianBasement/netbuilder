@@ -15,10 +15,9 @@ NetBuilder is a Roblox networking library, aiming to simplify network management
 - Definitions inside namespaces, for better organization.
 - Middlewares to have the ability to put your own custom behaviours to remotes. Middlewares have contextual, global and IO mapping support. There are [built-in middlewares](https://github.com/Rimuy/netbuilder/tree/main/src/Middleware) available for use.
 - Specific APIs for when choosing to connect events/functions on the client or server.
-- Async server functions with timeouts, using `CallAsync` in the client.
-- `Result` and `RustResult` ([rust-classes](https://github.com/Dionysusnu/rbxts-rust-classes)) return values for server functions.
+- AsyncFunctions with timeouts, using `CallAsync`.
+- (De)serialization for both parameters and return values.
 - Supports promise return values (asynchronous functions) for both events and functions.
-- Supports (de)serialization for both parameters and return values.
 
 ## Goals
 - An authentic, simple and intuitive API.
@@ -53,50 +52,63 @@ Model files are uploaded to every release as `.rbxmx` files. You can download th
 Let's get started with what definitions are, you can skip this part if you're already familiar with this concept.
 Definitions are identifier objects that we create to represent remote events/functions, for a more centralized way of sending and receiving requests.
 
-In NetBuilder, a remote instance is only registered and generated if the same is requested via `(Client|Server).Get(<Definition>)`. This allows us to create definitions that are going to be useful in the future and to prevent instance duplication.
+In NetBuilder, a remote instance is only registered and generated if the same is requested. This allows us to create definitions that are going to be useful in the future and to prevent instance duplication.
 
 ### Creating definitions
 The syntax for creating definitions is pretty straight forward. First we must instantiate `NetBuilder`, which is going to be our point of entry for adding definitions.
 Definition builders are abstract, we have `EventBuilder` for RemoteEvents and `FunctionBuilder` for RemoteFunctions.
 
-It's also possible to add a namespace that contains another dictionary of remote definitions created by a `NetBuilder` class.
+By default, the definitions must have typecheckers for every parameter and return value set.
+Both builders have a `SetArguments` method. This method takes a list of type checkers to construct its type definition.
+Return value type checkers are set via `SetReturn`. For the type checkers, it's recommended to use something like [t](https://github.com/osyrisrblx/t).
 
-We don't have to specify whether it's a client or server remote, that is meant to be decided when using the definition!
+It's also possible to add a namespace that contains another dictionary of remote definitions created by a `NetBuilder` class.
 
 ```js
 import { NetBuilder, EventBuilder, FunctionBuilder } from "@rbxts/netbuilder";
 
 export = new NetBuilder()
-	.AddDefinition(new EventBuilder<[message: string]>().Id("PrintMessage").Build())
-	.AddDefinition(new FunctionBuilder<(x: number, y: number) => number>().Id("Sum").Build())
-	.AddNamespace("Player",
-		new NetBuilder()
-			.AddDefinition(new EventBuilder<[itemId: number]>().Id("ConsumeItem").Build())
-			.AddDefinition(new FunctionBuilder<() => PlayerStatus>().Id("GetStatus").Build())
-			.Build()
+	.AddDefinition(new EventBuilder("PrintMessage").SetArguments(t.string).Build())
+	.AddDefinition(
+		new FunctionBuilder("Sum").SetArguments(t.number, t.number).SetReturn(t.number).Build(),
 	)
-	.AddNamespace("Party",
+	.AddNamespace(
+		"Player",
 		new NetBuilder()
-			.AddDefinition(new FunctionBuilder<(info: PartyCreatorInfo) => Party>().Id("Create").Build())
-			.AddDefinition(new FunctionBuilder<(partyId: number) => void>().Id("Disband").Build())
-			.AddDefinition(new EventBuilder<[partyId: number]>().Id("SendJoinRequest").Build())
-			.AddDefinition(new EventBuilder<[invitedPlayer: Player, partyId: number]>().Id("SendInvite").Build())
-			.Build()
+			.AddDefinition(new EventBuilder("ConsumeItem").SetArguments(t.number).Build())
+			.AddDefinition(new FunctionBuilder("GetStatus").SetReturn(t.PlayerStatus).Build())
+			.Build(),
+	)
+	.AddNamespace(
+		"Party",
+		new NetBuilder()
+			.AddDefinition(
+				new FunctionBuilder("Create")
+					.SetArguments(t.PartyInfoCreator)
+					.SetReturn(t.Party)
+					.Build(),
+			)
+			.AddDefinition(new FunctionBuilder("Disband").SetArguments(t.number).Build())
+			.AddDefinition(new EventBuilder("SendJoinRequest").SetArguments(t.number).Build())
+			.AddDefinition(new EventBuilder("SendInvite").SetArguments(t.number, t.number).Build())
+			.Build(),
 	)
 	.Build();
 ```
 
+We don't have to specify whether it's a client or server remote, that is meant to be decided when using the definition!
+
 ### Using definitions
 To use the definitions we have stored, there are dispatchers for both sides that allow us to send and receive requests.
-They can be created by using `(Client|Server).Get`, as previously stated.
+They can be created by using `<Client|Server>.Get<Event|Function|AsyncFunction>(<Definition>)`, as previously stated.
 
 ```js
 // Client-side
 import { Client } from "@rbxts/netbuilder";
 import { Player, PrintMessage } from "shared/Remotes";
 
-const printMessageEvent = Client.Get(PrintMessage);
-const playerStatusEvent = Client.Get(Player.GetStatus);
+const printMessageEvent = Client.GetEvent(PrintMessage);
+const playerStatusEvent = Client.GetFunction(Player.GetStatus);
 
 printMessageEvent.Send("Hello world!");
 playerStatusEvent.Call(); // { Level: 1, Atk: 25, Def: 10 }
@@ -106,38 +118,34 @@ import { Server } from "@rbxts/netbuilder";
 import { Player, PrintMessage } from "shared/Remotes";
 import getPlayerStatus from "shared/PlayerData";
 
-Server.Get(PrintMessage).Connect(print);
-Server.Get(Player.GetStatus).Connect(getPlayerStatus);
+Server.GetEvent(PrintMessage).Connect(print);
+Server.GetFunction(Player.GetStatus).SetCallback(getPlayerStatus);
 ```
 
 Once the game starts, the remote instances are automatically generated in a folder named `NetBuilderRemotes`, located in `ReplicatedStorage`. A way to change the location of the instances will be explained later.
 
 ![Generated Remotes S1](assets/generated_remotes1.png)
 
-However, the library only generates remote instances from definitions that are registered via `Server.Get`, which means that if we use the above example, it'll likely only generate two remote instances:
+However, the library only generates remote instances from definitions that are registered via `Server.Get<...>`, which means that if we use the above example, it'll likely only generate two remote instances:
 
 ![Generated Remotes S2](assets/generated_remotes2.png)
 
 > Note: Client functions are not supported, therefore cannot be used and will throw an error if doing so.
 
 ### Configuring namespaces
-Namespaces are configurable! With `NetBuilder.Configure`, we're able to change how the library will behave for a specific namespace and its descendants. Any configuration applied to a descendant will overwrite the existing one.
+Namespaces are configurable! With the `Configure` method, we're able to change how the library will behave for a specific namespace and its descendants. Any configuration applied to a descendant will overwrite the existing one.
 
 Current available fields for configuration are:
 - `RootInstance` - Changes the location of the remote instances main directory.
 - `SupressWarnings` - Disables all the warnings emitted from the library.
 
 ```js
-import { NetBuilder } from "@rbxts/netbuilder";
-
-export = new NetBuilder()
-	.Configure({
-		RootInstance: (rs) => rs.WaitForChild("MyRemotes"),
-		SupressWarnings: true,
-	})
+new NetBuilder()
+	.SetRoot((rs) => rs.WaitForChild("MyRemotes"))
+	.SupressWarnings()
 	.AddNamespace("Foo",
 		new NetBuilder()
-			.Configure({ RootInstance: (rs) => rs.WaitForChild("FooRemotes") })
+			.SetRoot((rs) => rs.WaitForChild("FooRemotes"))
 			// ...
 			.Build(),
 	)
@@ -146,14 +154,191 @@ export = new NetBuilder()
 ```
 
 ## Middleware Guide
+Middlewares are a way to add custom behaviour to our remotes. They are fully customizable, which means that we are able to change what is sent/received and to drop a request if necessary.
 
-### Making a custom middleware
+### Using middlewares
+As simple as just chaining `WithMiddleware`. It takes a list of middlewares and adds them to the definition's registry.
+The middlewares used in the below example are `RateLimiter`, which limits how many request can be made per minute, and `Tracer`, which just executes its callback whenever a request is made, providing some information. Both are globally-enabled and can be namespace-wide!
+
+```js
+new NetBuilder()
+	.AddDefinition(
+		new EventBuilder("Print")
+			.SetArguments(t.string)
+			.WithMiddleware([
+				RateLimiter({ MaxPerMinute: 10 }),
+				Tracer((executor) => print(`Hello, ${executor.Name}!`)),
+			])
+			.Build()
+	)
+	.Build();
+```
+
+Now this is what it looks when we're using them globally. `WithGlobalMiddleware` registers a list of middlewares to the namespace, so any request made will first go through its definition's middlewares, and then the global ones before executing its callback.
+
+```js
+new NetBuilder()
+	.WithGlobalMiddleware([
+		RateLimiter({ MaxPerMinute: 15 }),
+		Tracer((executor, definition, ...args) =>
+			print(
+				`[${definition.Id}]`,
+				`${executor.Name} has sent a request with the parameters: [${args.join()}]`,
+			),
+		),
+	])
+	.AddDefinition(
+		new EventBuilder("Print")
+			.SetArguments(t.string)
+			.WithMiddleware([RateLimiter({ MaxPerMinute: 5 })])
+			.Build()
+	)
+	.AddDefinition(
+		new FunctionBuilder("Sum")
+			.SetArguments(t.number, t.number)
+			.SetReturn(t.number)
+			.Build()
+	)
+	.Build();
+```
+
+Middlewares cannot be used twice in the same definition. Identifiers are assigned to each middleware so that they can be unique. This prevents duplicates that could potentially be prejudicial to the definition's behaviour.
+
+In this example, both `Print` and `Sum` contains a `RateLimiter`, the difference is that one of them was registered locally. Definition-wide middlewares have priority over namespace-wide ones, so if our definition has a middleware that already exists in the namespace, it'll be overwriten in favour of the local one. So now `Print`'s capacity is only 5 requests per minute!
+
+### Writing a custom middleware
+Custom middlewares can be easily created via `NetBuilder.CreateMiddleware`. All middlewares should be created with an ID and a callback that can have arguments that are gonna be used in the custom middleware, and must return a `MiddlewareCreator` object.
+
+It's possible to limit the middleware boundaries, we can choose whether the middleware is gonna be processed on the server or both client and server. If `ServerOnly` is set to true, the object must contain a `Callback` function, otherwise it can contain a `Sender` and a `Receiver` function, which are both optional.
+
+Middleware callbacks are functions that has three parameters: the definition used and two functions for middleware management.
+`processNext` and `drop` are functions that once executed, will terminate the its thread and all of the code below it, will be ignored.
+The difference between these two is quite clear, while `processNext` takes the new parameters and return value to the next middleware, `drop` will *drop* the request and return an error.
+
+```ts
+// LegacySystem.ts
+/** Middleware that works half of the time... **/
+const LegacySystem = NetBuilder.CreateMiddleware<[errMessage: string]>(
+	"LegacySystem",
+	(msg) => ({
+		ServerOnly: true,
+		Callback: (_definition, processNext, drop) => {
+			return (player, ...args) => {
+				if (os.time() % 2 === 0) {
+					drop(msg);
+				}
+
+				processNext(args);
+			};
+		},
+	}),
+);
+
+export = LegacySystem;
+
+// Remotes.ts
+export = new EventBuilder("Hello")
+	.WithMiddleware([LegacySystem("This is a very old system, period.")])
+	.Build();
+```
 
 ## Serialization Guide
+When talking about serialization for remotes, developers usually use helper functions for their classes to cross the client-server boundary. Well, the main issue with this method is that it's too repetitive. In NetBuilder, this can be simplified a lot by simply implementing the correct methods to the created classes and adding them to the serialization registry.
+
+There is also a second method for serializing existing classes that doesn't contain the serialization methods. Those are called `Serializers`.
 
 ### Creating a serializable class
+Classes must implement the `Serializable` interface in order to be serializable, which has a static `deserialize` method and a `Serialize` method. Simple as.
 
-### Serializing an existing class
+```ts
+import { Serializable } from "@rbxts/netbuilder";
+
+interface Props {
+	name: string;
+	age: number;
+}
+
+class Person implements Serializable<Props> {
+	public constructor(private name: string, private age: number) {}
+
+	public static deserialize({ name, age }: Props) {
+		return new Person(name, age);
+	}
+
+	public Serialize() {
+		return {
+			name: this.name,
+			age: this.age,
+		};
+	}
+
+	public Introduce() {
+		print(`Hello, my name is ${this.name} and I'm ${this.age} years old!`);
+	}
+
+	public IsUnderage() {
+		return this.age < 18;
+	}
+}
+```
+
+> *camelCase* is also supported for the serialize method.
+
+### Creating serializers for existing classes
+However, you may also want to register an existing class to send their instances over remotes. Since this can't be done using the implementation method, we can use `NetBuilder.CreateSerializer`, a static method for creating *serializers* for objects.
+
+The code below shows exactly how to do that, using our good ol' `Result` class from [rust-classes](https://github.com/Dionysusnu/rbxts-rust-classes).
+
+```ts
+type SResult = { Type: "Ok"; Value: defined } | { Type: "Err"; Error: defined };
+
+NetBuilder.CreateSerializer<SResult>(Result, {
+	Serialize(value: Result<defined, defined>) {
+		return value.isOk()
+			? { Type: "Ok", Value: value.unwrap() }
+			: { Type: "Err", Error: value.unwrapErr() };
+	},
+	Deserialize(serialized) {
+		return serialized.Type === "Ok"
+			? Result.ok(serialized.Value)
+			: Result.err(serialized.Error);
+	},
+});
+```
+
+### Registering serializable classes & serializers
+We have our classes ready, but how do we register them? All we need to do is to chain the `WithSerialization` method from the namespace's builder. It takes a list of serializable classes and serializers.
+
+After that, the job is complete and our remote is ready to send and receive requests without having to worry about calling other functions to handle our classes.
+
+```js
+// Something.server.ts
+import Remotes from "shared/Remotes";
+
+Server.GetEvent(Remotes.Introduction).Connect((player, person) => {
+	person.Introduce();
+
+	if (person.IsUnderage()) {
+		return Result.err("Permission denied because the person is underage.");
+	}
+
+	return Result.ok("Welp, there you go.");
+});
+
+// Remotes.ts
+import Person from "../Class/Person";
+import RustResult from "../Serializer/RustResult";
+
+export = new NetBuilder()
+	.WithSerialization([Person, RustResult])
+	.AddDefinition(
+		new FunctionBuilder("Introduction")
+			.SetArguments(t.Person)
+			.SetReturn(t.RustResult)
+			.Build()
+	)
+	.Build();
+```
 
 ## Useful links
 - [Example](example/)
