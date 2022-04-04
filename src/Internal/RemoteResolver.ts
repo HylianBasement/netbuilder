@@ -1,4 +1,3 @@
-// eslint-disable-next-line @typescript-eslint/triple-slash-reference
 import { Iterator, Option } from "@rbxts/rust-classes";
 
 import {
