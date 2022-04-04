@@ -118,15 +118,15 @@ import { Server } from "@rbxts/netbuilder";
 import { Player, PrintMessage } from "shared/Remotes";
 import getPlayerStatus from "shared/PlayerData";
 
-Server.GetEvent(PrintMessage).Connect(print);
-Server.GetFunction(Player.GetStatus).SetCallback(getPlayerStatus);
+Server.CreateEvent(PrintMessage).Connect(print);
+Server.CreateFunction(Player.GetStatus).SetCallback(getPlayerStatus);
 ```
 
 Once the game starts, the remote instances are automatically generated in a folder named `NetBuilderRemotes`, located in `ReplicatedStorage`. A way to change the location of the instances will be explained later.
 
 ![Generated Remotes S1](assets/generated_remotes1.png)
 
-However, the library only generates remote instances from definitions that are registered via `Server.Get<...>`, which means that if we use the above example, it'll likely only generate two remote instances:
+However, the library only generates remote instances from definitions that are registered via `Server.Create<...>`, which means that if we use the above example, it'll likely only generate two remote instances:
 
 ![Generated Remotes S2](assets/generated_remotes2.png)
 
@@ -315,7 +315,7 @@ After that, the job is complete and our remote is ready to send and receive requ
 // Something.server.ts
 import Remotes from "shared/Remotes";
 
-Server.GetEvent(Remotes.Introduction).Connect((player, person) => {
+Server.CreateEvent(Remotes.Introduction).Connect((player, person) => {
 	person.Introduce();
 
 	if (person.IsUnderage()) {
