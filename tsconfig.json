@@ -1,6 +1,7 @@
 {
 	"compilerOptions": {
 		// required
+		"esModuleInterop": true,
 		"allowSyntheticDefaultImports": true,
 		"downlevelIteration": true,
 		"jsx": "react",
@@ -10,7 +11,7 @@
 		"moduleResolution": "Node",
 		"noLib": true,
 		"resolveJsonModule": true,
-		"experimentalDecorators": true,
+		"stripInternal": true,
 		"forceConsistentCasingInFileNames": true,
 		"strict": true,
 		"target": "ESNext",

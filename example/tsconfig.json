@@ -1,16 +1,15 @@
 {
 	"compilerOptions": {
 		// required
+		"esModuleInterop": true,
 		"allowSyntheticDefaultImports": true,
 		"downlevelIteration": true,
 		"jsx": "react",
 		"jsxFactory": "Roact.createElement",
-		"jsxFragmentFactory": "Roact.Fragment",
 		"module": "commonjs",
 		"moduleResolution": "Node",
 		"noLib": true,
 		"resolveJsonModule": true,
-		"experimentalDecorators": true,
 		"forceConsistentCasingInFileNames": true,
 		"strict": true,
 		"target": "ESNext",
@@ -18,12 +17,12 @@
 
 		// configurable
 		"removeComments": true,
-		"rootDirs": ["../src", "client", "server", "shared"],
+		"rootDirs": ["client", "server", "shared", "../src"],
 		"outDir": "out",
 		"baseUrl": ".",
 		"paths": {
 			"@rbxts/netbuilder": ["../src"],
-			"@rbxts/netbuilder/*": ["../src/*"]
+			"@rbxts/t": ["./shared/t"]
 		}
 	},
 	"include": [

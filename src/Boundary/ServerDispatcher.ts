@@ -115,7 +115,7 @@ class ServerDispatcher<F extends Callback> {
 			netBuilderError(`Expected RemoteFunction, got ${remote ? "RemoteEvent" : "nil"}.`, 3);
 		}
 
-		const result = Middleware.CreateSender(definition, ...args) as ThreadResult;
+		const result = Middleware.CreateSender(definition, player, ...args) as ThreadResult;
 
 		if (result.isOk()) {
 			const [newArgs, resultFn] = result.unwrap();
@@ -163,29 +163,26 @@ class ServerDispatcher<F extends Callback> {
 	public Send(player: Player | Player[], ...args: Parameters<F>) {
 		if (!assertRemoteType("RemoteEvent", this.remote)) return;
 
-		const result = Middleware.CreateSender(this.definition, ...(args as unknown[]));
+		for (const plr of this.resolvePlayerList(player)) {
+			const result = Middleware.CreateSender(this.definition, plr, ...(args as unknown[]));
 
-		if (result.isOk()) {
-			for (const plr of this.resolvePlayerList(player)) {
-				this.remote.FireClient(plr, ...(result.unwrap()[0] as never));
+			if (result.isOk()) {
+				return this.remote.FireClient(plr, ...(result.unwrap()[0] as never));
 			}
-			return;
-		}
 
-		netBuilderError(result.unwrapErr(), 3);
+			netBuilderError(result.unwrapErr(), 3);
+		}
 	}
 
 	/** Fires all the clients. */
-	public SendToAll(...args: Parameters<F>) {
+	public SendToAll(useMiddleware: boolean, ...args: Parameters<F>) {
 		if (!assertRemoteType("RemoteEvent", this.remote)) return;
 
-		const result = Middleware.CreateSender(this.definition, ...(args as unknown[]));
-
-		if (result.isOk()) {
-			return this.remote.FireAllClients(...(result.unwrap()[0] as never));
+		if (useMiddleware) {
+			return this.SendWithout([], ...(args as never));
 		}
 
-		netBuilderError(result.unwrapErr(), 3);
+		this.remote.FireAllClients(...(args as never));
 	}
 
 	/** Fires all the clients, except for a selected one or a specific group. */

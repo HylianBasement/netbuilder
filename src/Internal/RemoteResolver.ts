@@ -99,8 +99,14 @@ class RemoteResolver<F extends Callback> {
 	}
 
 	private static unwrapRootInstance(root: NetBuilderConfiguration["RootInstance"]) {
-		return typeIs(root, "function")
-			? Option.some(root(ReplicatedStorage))
+		const r = ReplicatedStorage.FindFirstChild(this.defaultRootName);
+
+		return this.root !== undefined
+			? Option.some(this.root)
+			: r
+			? Option.some(r)
+			: typeIs(root, "function")
+			? Option.wrap(root(ReplicatedStorage))
 			: root
 			? Option.some(root)
 			: Option.none<Instance>();
@@ -111,16 +117,9 @@ class RemoteResolver<F extends Callback> {
 		const def = definition as unknown as DefinitionMembers;
 		const config = def.Namespace[Configuration] as NetBuilderConfiguration;
 
-		this.unwrapRootInstance(config.RootInstance)
-			.andWith<Instance>((root) =>
-				root.Parent && this.root !== root ? Option.some(root) : Option.none(),
-			)
-			.andWith((root) => {
-				this.root = root;
-
-				return Option.some(true);
-			})
-			.unwrapOr(!this.root && this.createDirectory(this.defaultRootName, ReplicatedStorage));
+		this.root = this.unwrapRootInstance(config.RootInstance).unwrapOrElse(() =>
+			this.createDirectory(this.defaultRootName, ReplicatedStorage),
+		);
 
 		const { entries } = this;
 		const { Id, Kind } = def;
@@ -169,18 +168,18 @@ class RemoteResolver<F extends Callback> {
 
 	// Client
 	public static Request<F extends Callback>(definition: DefinitionMembers) {
-		const root = this.unwrapRootInstance(
-			(definition.Namespace[Configuration] as NetBuilderConfiguration).RootInstance,
-		) as Option<{ Name: string; Parent?: Instance }>;
+		const root = (
+			this.unwrapRootInstance(
+				(definition.Namespace[Configuration] as NetBuilderConfiguration).RootInstance,
+			) as Option<{ Name: string; Parent?: Instance }>
+		).expect("An error occured while trying to unwrap the root directory.");
 
-		const parent = root.andWith((root) => Option.some(root.Parent!)).unwrapOr(ReplicatedStorage);
+		const parent = root.Parent!;
 
 		return Promise.retryWithDelay(
 			() =>
 				new Promise((res, rej) => {
-					const remote = parent
-						.WaitForChild(root.unwrapOr({ Name: this.defaultRootName }).Name)
-						.FindFirstChild(definition.Id, true);
+					const remote = parent.WaitForChild(root.Name).FindFirstChild(definition.Id, true);
 
 					remote ? res(remote) : rej();
 				}),

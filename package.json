@@ -5,6 +5,8 @@
   "main": "out/init.lua",
   "scripts": {
     "build": "rbxtsc --verbose",
+    "build:example": "rbxtsc --verbose --type=game -i ./include -p ./example",
+    "serve:example": "rojo serve ./example/default.project.json",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

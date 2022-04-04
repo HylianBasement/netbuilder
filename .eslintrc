@@ -5,10 +5,11 @@
 		"useJSXTextNode": true,
 		"ecmaVersion": 2021,
 		"sourceType": "module",
-		"project": "./tsconfig.json"
+		"project": "*/tsconfig.json"
 	},
 	"ignorePatterns": [
-		"/out"
+		"/out",
+		"/example/out"
 	],
 	"plugins": [
 		"@typescript-eslint",

@@ -40,16 +40,16 @@ namespace Middleware {
 		callback: F,
 	): (...args: unknown[]) => NetBuilderResult<unknown> {
 		return (...args: unknown[]) => {
-			const player = getPlayerFromArgs(...args);
+			const player = IS_SERVER ? (args as [Player]).shift()! : Players.LocalPlayer;
 			const middlewares = getMiddlewares(definition);
 
-			const executeFn = (...args: unknown[]) =>
-				awaitPromiseDeep(RunService.IsServer() ? callback(player, ...args) : callback(...args));
+			const executeFn = (...a: unknown[]) =>
+				awaitPromiseDeep(IS_SERVER ? callback(player, ...a) : callback(...a));
 
-			const [parameterChecks] = definition.Checks;
+			const [parameterChecks, returnValueCheck] = definition.Checks;
 
 			if (middlewares.size() > 0) {
-				const state = resolveMiddlewares(definition, "Recv", args);
+				const state = resolveMiddlewares(player, definition, "Recv", args);
 
 				if (state.Result.isErr()) {
 					const message = state.Result.unwrapErr();
@@ -84,7 +84,6 @@ namespace Middleware {
 				const returnValue = executeFn(...newArgs);
 
 				if (definition.Kind !== "Event") {
-					const [, returnValueCheck] = definition.Checks;
 					const [failed, message] = TypeChecking.ReturnValue(returnValue, returnValueCheck);
 
 					if (IS_SERVER && failed) {
@@ -101,21 +100,22 @@ namespace Middleware {
 				};
 			}
 
-			if (definition.Kind !== "Event") {
-				const [failed, message] = TypeChecking.Parameters(args, parameterChecks);
+			const newArgs = (args as defined[]).map((v) =>
+				Serialization.Deserialize(definition.Namespace, v),
+			);
 
-				if (IS_SERVER && failed) {
-					return {
-						Type: "Err",
-						Message: message,
-					};
-				}
+			const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
+
+			if (IS_SERVER && failed) {
+				return {
+					Type: "Err",
+					Message: message,
+				};
 			}
 
-			const returnValue = executeFn(...args);
+			const returnValue = executeFn(...newArgs);
 
 			if (definition.Kind !== "Event") {
-				const [, returnValueCheck] = definition.Checks;
 				const [failed, message] = TypeChecking.ReturnValue(returnValue, returnValueCheck);
 
 				if (IS_SERVER && failed) {
@@ -140,14 +140,14 @@ namespace Middleware {
 
 	export function CreateSender(
 		definition: DefinitionMembers,
+		player: Player,
 		...args: unknown[]
 	): Result<[unknown[], (r: unknown) => unknown], string> {
 		const middlewares = getMiddlewares(definition);
 		const [parameterChecks] = definition.Checks;
 
 		if (middlewares.size() > 0) {
-			const state = resolveMiddlewares(definition, "Send", args);
-
+			const state = resolveMiddlewares(player, definition, "Send", args);
 			const newArgs = (state.CurrentParameters as defined[]).map((v) =>
 				Serialization.Serialize(definition.Namespace, v),
 			);
@@ -173,7 +173,6 @@ namespace Middleware {
 		}
 
 		const newArgs = (args as defined[]).map((v) => Serialization.Serialize(definition.Namespace, v));
-
 		const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
 
 		if (IS_SERVER && failed) {
@@ -202,12 +201,16 @@ namespace Middleware {
 		}
 	}
 
-	function resolveMiddlewares(definition: DefinitionMembers, kind: "Send" | "Recv", args: unknown[]) {
-		const player = getPlayerFromArgs(...args);
+	function resolveMiddlewares(
+		player: Player,
+		definition: DefinitionMembers,
+		kind: "Send" | "Recv",
+		args: unknown[],
+	) {
 		const middlewares = getMiddlewares(definition);
 
 		const state: Optional<MiddlewareEntry, "Result"> = {
-			CurrentParameters: resolveParameters(args),
+			CurrentParameters: args,
 			ReturnCallbacks: [],
 		};
 
@@ -236,24 +239,6 @@ namespace Middleware {
 		}
 
 		return state as MiddlewareEntry;
-	}
-
-	function resolveParameters(args: unknown[]) {
-		const newArgs = [...args];
-
-		if (RunService.IsServer()) {
-			(newArgs as defined[]).shift();
-		}
-
-		return newArgs;
-	}
-
-	function getPlayerFromArgs(...args: unknown[]) {
-		if (RunService.IsClient()) {
-			return Players.LocalPlayer;
-		}
-
-		return (args as [Player]).shift()!;
 	}
 
 	function createChannel(definition: DefinitionMembers, channel: MiddlewareCallback<Callback>) {

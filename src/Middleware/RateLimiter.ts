@@ -18,10 +18,10 @@ const Players = game.GetService("Players");
 const RateLimiter = NetBuilder.CreateMiddleware<[options: RateLimiterOptions]>(
 	"RateLimiter",
 	(options) => {
-		const players = HashMap.empty<number, RateLimiterProperties>();
+		const players = HashMap.empty<string, RateLimiterProperties>();
 
 		if (RunService.IsServer()) {
-			Players.PlayerRemoving.Connect((player) => players.remove(player.UserId));
+			Players.PlayerRemoving.Connect((player) => players.remove(tostring(player.UserId)));
 		}
 
 		return {
@@ -31,7 +31,7 @@ const RateLimiter = NetBuilder.CreateMiddleware<[options: RateLimiterOptions]>(
 				return (player, ...args) => {
 					const { MaxPerMinute } = options;
 					const { Requests } = players
-						.entry(player.UserId)
+						.entry(tostring(player.UserId))
 						.andModify((props) => {
 							const now = DateTime.now();
 

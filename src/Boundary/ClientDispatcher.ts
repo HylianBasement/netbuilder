@@ -21,6 +21,7 @@ import netBuilderWarn from "../Util/netBuilderWarn";
 import promiseYield from "../Util/promiseYield";
 
 const RunService = game.GetService("RunService");
+const player = game.GetService("Players").LocalPlayer;
 
 /** Definition manager responsible for processing client events and async functions. */
 class ClientDispatcher<F extends Callback> {
@@ -149,7 +150,11 @@ class ClientDispatcher<F extends Callback> {
 			netBuilderError(`Expected RemoteFunction, got ${remote ? "RemoteEvent" : "nil"}.`, 3);
 		}
 
-		const result = Middleware.CreateSender(definition, ...(args as unknown[])) as ThreadResult;
+		const result = Middleware.CreateSender(
+			definition,
+			player,
+			...(args as unknown[]),
+		) as ThreadResult;
 
 		if (result.isOk()) {
 			const [newArgs, resultFn] = result.unwrap();
@@ -179,7 +184,7 @@ class ClientDispatcher<F extends Callback> {
 
 		if (!assertRemoteType("RemoteEvent", remote)) return;
 
-		const result = Middleware.CreateSender(this.definition, ...(args as unknown[]));
+		const result = Middleware.CreateSender(this.definition, player, ...(args as unknown[]));
 
 		if (result.isOk()) {
 			return remote.FireServer(...(result.unwrap()[0] as never));
