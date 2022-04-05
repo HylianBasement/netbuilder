@@ -150,7 +150,7 @@ export interface LoggingDefinition {
 	readonly Kind: DefinitionKind;
 }
 
-export type InferDefinitonId<R> = R extends Definition<infer I, never, never> ? I : never;
+export type InferDefinitionId<R> = R extends Definition<infer I, never, never> ? I : never;
 
 export type InferDefinitionKind<R> = R extends Definition<never, infer K, never> ? K : never;
 

@@ -1,5 +1,5 @@
 import {
-	InferDefinitonId,
+	InferDefinitionId,
 	NetBuilderMiddleware,
 	NetBuilderSerializer,
 	NetBuilderConfiguration,
@@ -143,7 +143,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 	public AddDefinition<D extends Definition>(definition: D) {
 		this.definitions.push(definition);
 
-		return this as unknown as NetBuilder<R & { readonly [_ in InferDefinitonId<D>]: D }, O>;
+		return this as unknown as NetBuilder<R & { readonly [_ in InferDefinitionId<D>]: D }, O>;
 	}
 
 	/** Adds a child definition namespace. */
