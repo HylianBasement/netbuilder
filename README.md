@@ -8,7 +8,7 @@
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Package](https://badge.fury.io/js/%40rbxts%2Fnetbuilder.svg)](https://www.npmjs.com/package/@rbxts/netbuilder)
 
-NetBuilder is a Roblox networking library, aiming to simplify network management using the [builder pattern](https://refactoring.guru/design-patterns/builder) for creating remote definitions.
+NetBuilder is a Roblox networking library, aiming to simplify network management using the [builder pattern](https://refactoring.guru/design-patterns/builder) for creating remote definitions. Gives you full control over input and output values.
 
 ## Features
 - Builder API for creating and configuring definitions/middlewares.
