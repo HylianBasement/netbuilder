@@ -124,7 +124,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 	): NetBuilderSerializer<S> {
 		return {
 			Class: object,
-			Serialize(namespace, value) {
+			Serialization(namespace, value) {
 				return {
 					SerializationType: SerializationType.Custom,
 					SerializationId: (
@@ -133,7 +133,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 					Value: methods.Serialize(value),
 				};
 			},
-			Deserialize(serialized: S) {
+			Deserialization(serialized: S) {
 				return methods.Deserialize(serialized);
 			},
 		};

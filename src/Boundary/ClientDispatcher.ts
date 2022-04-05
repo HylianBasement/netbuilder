@@ -40,13 +40,13 @@ class ClientDispatcher<F extends Callback> {
 	}
 
 	private static get(definition: Definition, kind: DefinitionKind) {
-		const { Kind: defKind } = definition as unknown as DefinitionMembers;
+		const def = definition as unknown as DefinitionMembers;
 
-		if (defKind !== kind) {
-			netBuilderError(`Expected ${kind}, got ${defKind}.`, 3);
+		if (def.Kind !== kind) {
+			netBuilderError(`Expected ${kind}, got ${def.Kind}.`, 3);
 		}
 
-		return new ClientDispatcher(definition as unknown as DefinitionMembers);
+		return new ClientDispatcher(def);
 	}
 
 	/**
@@ -151,31 +151,31 @@ class ClientDispatcher<F extends Callback> {
 		}
 
 		const result = Middleware.CreateSender(
-			definition,
 			player,
+			definition,
 			...(args as unknown[]),
 		) as ThreadResult;
 
-		if (result.isOk()) {
-			const [newArgs, resultFn] = result.unwrap();
-			const returnResult = remote.InvokeServer(...(newArgs as never)) as NetBuilderResult<
-				ReturnType<F>
-			>;
+		return result.match(
+			([newArgs, resultFn]) => {
+				const returnResult = remote.InvokeServer(...(newArgs as never)) as NetBuilderResult<
+					ReturnType<F>
+				>;
 
-			if (returnResult.Type === "Err") {
-				return returnResult;
-			}
+				if (returnResult.Type === "Err") {
+					return returnResult;
+				}
 
-			return {
-				Type: "Ok",
-				Value: resultFn(returnResult.Value),
-			} as NetBuilderResult<UnwrapAsyncReturnType<F>>;
-		}
-
-		return {
-			Type: "Err",
-			Message: result.unwrapErr(),
-		};
+				return {
+					Type: "Ok",
+					Value: resultFn(returnResult.Value),
+				} as NetBuilderResult<UnwrapAsyncReturnType<F>>;
+			},
+			(msg) => ({
+				Type: "Err",
+				Message: msg,
+			}),
+		);
 	}
 
 	/** Sends a request to the server with the given arguments. */
@@ -184,7 +184,7 @@ class ClientDispatcher<F extends Callback> {
 
 		if (!assertRemoteType("RemoteEvent", remote)) return;
 
-		const result = Middleware.CreateSender(this.definition, player, ...(args as unknown[]));
+		const result = Middleware.CreateSender(player, this.definition, ...(args as unknown[]));
 
 		if (result.isOk()) {
 			return remote.FireServer(...(result.unwrap()[0] as never));

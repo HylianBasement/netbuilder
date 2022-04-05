@@ -67,8 +67,8 @@ export interface SerializationMap {
 
 export interface NetBuilderSerializer<S extends defined> {
 	readonly Class: object;
-	Serialize(namespace: DefinitionNamespace, value: object): SerializedObject<S>;
-	Deserialize(serialized: S): object;
+	Serialization(namespace: DefinitionNamespace, value: object): SerializedObject<S>;
+	Deserialization(serialized: S): object;
 }
 
 export type SerializableObject = NetBuilderSerializer<defined> | SerializableClass;

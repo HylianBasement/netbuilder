@@ -139,8 +139,8 @@ namespace Middleware {
 	}
 
 	export function CreateSender(
-		definition: DefinitionMembers,
 		player: Player,
+		definition: DefinitionMembers,
 		...args: unknown[]
 	): Result<[unknown[], (r: unknown) => unknown], string> {
 		const middlewares = getMiddlewares(definition);

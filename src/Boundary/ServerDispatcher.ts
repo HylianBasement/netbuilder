@@ -39,13 +39,13 @@ class ServerDispatcher<F extends Callback> {
 	}
 
 	private static create(definition: Definition, kind: DefinitionKind) {
-		const { Kind: defKind } = definition as unknown as DefinitionMembers;
+		const def = definition as unknown as DefinitionMembers;
 
-		if (defKind !== kind) {
-			netBuilderError(`Expected ${kind}, got ${defKind}.`, 3);
+		if (def.Kind !== kind) {
+			netBuilderError(`Expected ${kind}, got ${def.Kind}.`, 3);
 		}
 
-		return new ServerDispatcher(definition as unknown as DefinitionMembers);
+		return new ServerDispatcher(def);
 	}
 
 	/**
@@ -93,7 +93,7 @@ class ServerDispatcher<F extends Callback> {
 	private resolvePlayerList(playerOrPlayers: Player | Player[]) {
 		return (
 			type(playerOrPlayers) !== "table" ? [playerOrPlayers] : playerOrPlayers
-		) as readonly Player[];
+		) as ReadonlyArray<Player>;
 	}
 
 	private toString() {
@@ -115,28 +115,29 @@ class ServerDispatcher<F extends Callback> {
 			netBuilderError(`Expected RemoteFunction, got ${remote ? "RemoteEvent" : "nil"}.`, 3);
 		}
 
-		const result = Middleware.CreateSender(definition, player, ...args) as ThreadResult;
+		const result = Middleware.CreateSender(player, definition, ...args) as ThreadResult;
 
-		if (result.isOk()) {
-			const [newArgs, resultFn] = result.unwrap();
-			const returnResult = remote.InvokeClient(player, ...(newArgs as never)) as NetBuilderResult<
-				ReturnType<F>
-			>;
+		return result.match(
+			([newArgs, resultFn]) => {
+				const returnResult = remote.InvokeClient(
+					player,
+					...(newArgs as never),
+				) as NetBuilderResult<ReturnType<F>>;
 
-			if (returnResult.Type === "Err") {
-				return returnResult;
-			}
+				if (returnResult.Type === "Err") {
+					return returnResult;
+				}
 
-			return {
-				Type: "Ok",
-				Value: resultFn(returnResult.Value),
-			} as NetBuilderResult<UnwrapAsyncReturnType<F>>;
-		}
-
-		return {
-			Type: "Err",
-			Message: result.unwrapErr(),
-		};
+				return {
+					Type: "Ok",
+					Value: resultFn(returnResult.Value),
+				} as NetBuilderResult<UnwrapAsyncReturnType<F>>;
+			},
+			(msg) => ({
+				Type: "Err",
+				Message: msg,
+			}),
+		);
 	}
 
 	/** Calls a client **asynchronously** with a timeout. */
@@ -164,7 +165,7 @@ class ServerDispatcher<F extends Callback> {
 		if (!assertRemoteType("RemoteEvent", this.remote)) return;
 
 		for (const plr of this.resolvePlayerList(player)) {
-			const result = Middleware.CreateSender(this.definition, plr, ...(args as unknown[]));
+			const result = Middleware.CreateSender(plr, this.definition, ...(args as unknown[]));
 
 			if (result.isOk()) {
 				return this.remote.FireClient(plr, ...(result.unwrap()[0] as never));
