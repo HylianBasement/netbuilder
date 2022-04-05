@@ -83,6 +83,12 @@ export type NetBuilderResult<T> =
 			Message: string;
 	  };
 
+export interface NetBuilderAsyncReturn<T> extends Promise<T> {
+	catch<TResult = never>(
+		onRejected?: ((reason: string) => TResult | Promise<TResult>) | void,
+	): Promise<T | TResult>;
+}
+
 export interface NetBuilderConfiguration {
 	RootInstance?: Instance | ((replicatedStorage: ReplicatedStorage) => Instance);
 	SuppressWarnings?: boolean;

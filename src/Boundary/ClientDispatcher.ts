@@ -8,6 +8,7 @@ import {
 	UnwrapAsyncReturnType,
 	DefinitionKind,
 	InferDefinitionKind,
+	NetBuilderAsyncReturn,
 } from "../definitions";
 
 import Middleware from "../Internal/Middleware";
@@ -131,7 +132,7 @@ class ClientDispatcher<F extends Callback> {
 			Promise.delay(this.warningTimeout)
 				.andThenCall(netBuilderWarn, this.definition, this.warningTimeoutMsg())
 				.then(promiseYield),
-		]) as Promise<UnwrapAsyncReturnType<F>>;
+		]) as NetBuilderAsyncReturn<UnwrapAsyncReturnType<F>>;
 	}
 
 	/** Calls the server synchronously that returns a raw `Result` value that is transformed by its predicate function. */

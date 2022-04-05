@@ -4,6 +4,7 @@ import {
 	DefinitionMembers,
 	InferDefinitionKind,
 	InferDefinitionTyping,
+	NetBuilderAsyncReturn,
 	NetBuilderResult,
 	ThreadResult,
 	UnwrapAsyncReturnType,
@@ -157,7 +158,7 @@ class ServerDispatcher<F extends Callback> {
 			Promise.delay(this.warningTimeout)
 				.andThenCall(netBuilderWarn, this.definition, this.warningTimeoutMsg())
 				.then(promiseYield),
-		]) as Promise<UnwrapAsyncReturnType<F>>;
+		]) as NetBuilderAsyncReturn<UnwrapAsyncReturnType<F>>;
 	}
 
 	/** Fires a client event for a player or a specific group of clients. */
