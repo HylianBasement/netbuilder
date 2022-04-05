@@ -100,7 +100,6 @@ We don't have to specify whether it's a client or server remote, that is meant t
 
 ### Using definitions
 To use the definitions we have stored, there are dispatchers for both sides that allow us to send and receive requests.
-They can be created by using `<Client|Server>.Get<Event|Function|AsyncFunction>(<Definition>)`, as previously stated.
 
 ```js
 // Client-side
@@ -287,7 +286,7 @@ class Person implements Serializable<Props> {
 ### Creating serializers for existing classes
 However, you may also want to register an existing class to send their instances over remotes. Since this can't be done using the implementation method, we can use `NetBuilder.CreateSerializer`, a static method for creating *serializers* for objects.
 
-The code below shows exactly how to do that, using our good ol' `Result` class from [rust-classes](https://github.com/Dionysusnu/rbxts-rust-classes).
+The code below shows exactly how to do that, using our good old `Result` class from [rust-classes](https://github.com/Dionysusnu/rbxts-rust-classes).
 
 ```ts
 type SResult = { Type: "Ok"; Value: defined } | { Type: "Err"; Error: defined };
