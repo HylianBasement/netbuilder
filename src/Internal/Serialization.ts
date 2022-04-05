@@ -20,7 +20,7 @@ namespace Serialization {
 		const serializer = map.SerializerClasses.get(mt)?.Serializer;
 
 		if (serializer) {
-			return serializer.Serialize(namespace, value);
+			return serializer.Serialization(namespace, value);
 		}
 
 		return isSerializableClassInstance(namespace, value)
@@ -54,7 +54,7 @@ namespace Serialization {
 
 		const serializers = namespace[Serializers] as Array<NetBuilderSerializer<defined>>;
 
-		return serializers[value.SerializationId - 1].Deserialize(value.Value);
+		return serializers[value.SerializationId - 1].Deserialization(value.Value);
 	}
 
 	export function IsSerializer(value: defined): value is NetBuilderSerializer<defined> {
