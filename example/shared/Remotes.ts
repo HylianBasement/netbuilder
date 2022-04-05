@@ -6,7 +6,6 @@ import Person from "./Class/Person";
 const personCheck = (value: unknown): value is Person => value instanceof Person;
 
 export = new NetBuilder()
-	.SetRoot((rs) => rs.WaitForChild("remotes"))
 	.WithSerialization([Person])
 	.AddDefinition(
 		new FunctionBuilder("VerifyAge").SetArguments(personCheck).SetReturn(t.boolean).Build(),
