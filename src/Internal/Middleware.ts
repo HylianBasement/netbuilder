@@ -14,7 +14,6 @@ import Serialization from "./Serialization";
 import GlobalMiddleware from "../Symbol/GlobalMiddleware";
 
 import definitionInfo from "../Util/definitionInfo";
-import awaitPromiseDeep from "../Util/awaitPromiseDeep";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import TypeChecking from "./TypeChecking";
 
@@ -185,6 +184,11 @@ namespace Middleware {
 			newArgs,
 			(r: unknown) => Serialization.Deserialize(definition.Namespace, r as never),
 		]);
+	}
+
+	function awaitPromiseDeep<T>(promise: T | Promise<T>): T {
+		const value = Promise.is(promise) ? promise.expect() : promise;
+		return Promise.is(value) ? awaitPromiseDeep<T>(value as T) : value;
 	}
 
 	function getMiddlewares(definition: DefinitionMembers) {
