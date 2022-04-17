@@ -14,7 +14,6 @@ import {
 	SerializationType,
 	SerializationMap as ISerializationMap,
 	InferDefinitionTyping,
-	DefinitionKind,
 	InferDefinitionKind,
 	ServerDefinition,
 	ClientDefinition,
@@ -22,10 +21,10 @@ import {
 
 import ConfigurationBuilder from "./ConfigurationBuilder";
 
-import ServerDispatcher from "../Boundary/ServerDispatcher";
-import ClientDispatcher from "../Boundary/ClientDispatcher";
+import ServerDispatcher from "../Communication/ServerDispatcher";
+import ClientDispatcher from "../Communication/ClientDispatcher";
 
-import Serialization from "../Internal/Serialization";
+import Serialization from "../Core/Serialization";
 
 import Configuration from "../Symbol/Configuration";
 import GlobalMiddleware from "../Symbol/GlobalMiddleware";

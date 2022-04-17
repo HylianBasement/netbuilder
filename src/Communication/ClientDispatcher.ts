@@ -1,19 +1,14 @@
 import {
-	Definition,
 	DefinitionMembers,
-	InferDefinitionTyping,
 	Remote,
 	NetBuilderResult,
 	ThreadResult,
 	UnwrapAsyncReturnType,
-	DefinitionKind,
-	InferDefinitionKind,
 	NetBuilderAsyncReturn,
-	ClientDefinition,
 } from "../definitions";
 
-import Middleware from "../Internal/Middleware";
-import RemoteResolver from "../Internal/RemoteResolver";
+import Middleware from "../Core/Middleware";
+import RemoteResolver from "../Core/RemoteResolver";
 
 import assertRemoteType from "../Util/assertRemoteType";
 import definitionInfo from "../Util/definitionInfo";
@@ -181,8 +176,7 @@ class ClientDispatcher<F extends Callback> {
 	}
 }
 
-const mt = ClientDispatcher as LuaMetatable<ClientDispatcher<Callback>>;
-mt.__call = (Self, ...args) => {
+(ClientDispatcher as LuaMetatable<ClientDispatcher<Callback>>).__call = (Self, ...args) => {
 	const kind = Self["definition"].Kind;
 
 	if (kind === "Event") {

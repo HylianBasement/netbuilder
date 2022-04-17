@@ -1,7 +1,7 @@
 import { Result } from "@rbxts/rust-classes";
 
-import ClientDispatcher from "./Boundary/ClientDispatcher";
-import ServerDispatcher from "./Boundary/ServerDispatcher";
+import ClientDispatcher from "./Communication/ClientDispatcher";
+import ServerDispatcher from "./Communication/ServerDispatcher";
 
 export type ArrayLength<T extends Array<any> | ReadonlyArray<any>> = (T & { length: number })["length"];
 

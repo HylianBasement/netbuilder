@@ -189,13 +189,13 @@ new NetBuilder()
 		new DefinitionBuilder("Print")
 			.SetArguments(t.string)
 			.WithMiddleware([RateLimiter({ MaxPerMinute: 5 })])
-			.AsNamespace()
+			.Build()
 	)
 	.AddDefinition(
 		new DefinitionBuilder("Sum")
 			.SetArguments(t.number, t.number)
 			.SetReturn(t.number)
-			.AsNamespace()
+			.Build()
 	)
 	.Build();
 ```

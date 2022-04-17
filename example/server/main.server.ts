@@ -1,6 +1,6 @@
-import Remotes from "shared/Remotes";
+import Definitions from "shared/Definitions";
 
-Remotes.Server.People.VerifyAge.SetCallback((_player, person) => {
+Definitions.Server.People.VerifyAge.SetCallback((_player, person) => {
 	person.Introduce();
 
 	if (person.IsUnderage()) {
@@ -12,4 +12,4 @@ Remotes.Server.People.VerifyAge.SetCallback((_player, person) => {
 
 task.wait(3);
 
-Remotes.Server.PrintOnClient.SendToAll("hi");
+Definitions.Server.PrintOnClient.SendToAll("hi");

@@ -1,18 +1,13 @@
 import {
-	Definition,
-	DefinitionKind,
 	DefinitionMembers,
-	InferDefinitionKind,
-	InferDefinitionTyping,
 	NetBuilderAsyncReturn,
 	NetBuilderResult,
-	ServerDefinition,
 	ThreadResult,
 	UnwrapAsyncReturnType,
 } from "../definitions";
 
-import Middleware from "../Internal/Middleware";
-import RemoteResolver from "../Internal/RemoteResolver";
+import Middleware from "../Core/Middleware";
+import RemoteResolver from "../Core/RemoteResolver";
 
 import assertRemoteType from "../Util/assertRemoteType";
 import definitionInfo from "../Util/definitionInfo";
@@ -20,7 +15,7 @@ import isRemoteFunction from "../Util/isRemoteFunction";
 import netBuilderError from "../Util/netBuilderError";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import promiseYield from "../Util/promiseYield";
-import { IS_SERVER } from "../Util/boundary";
+import { IS_RUNNING, IS_SERVER } from "../Util/boundary";
 
 const Players = game.GetService("Players");
 
@@ -112,7 +107,7 @@ class ServerDispatcher<F extends Callback> {
 
 	/** Fires a client event for a player or a specific group of clients. */
 	public Send(player: Player | Player[], ...args: Parameters<F>) {
-		if (!assertRemoteType("RemoteEvent", this.remote)) return;
+		if (!IS_RUNNING || !assertRemoteType("RemoteEvent", this.remote)) return;
 
 		for (const plr of this.resolvePlayerList(player)) {
 			const result = Middleware.CreateSender(plr, this.definition, ...(args as unknown[]));
@@ -127,14 +122,14 @@ class ServerDispatcher<F extends Callback> {
 
 	/** Fires all the clients. **(Does not use middlewares)** */
 	public SendToAll(...args: Parameters<F>) {
-		if (!assertRemoteType("RemoteEvent", this.remote)) return;
+		if (!IS_RUNNING || !assertRemoteType("RemoteEvent", this.remote)) return;
 
 		this.remote.FireAllClients(...(args as never));
 	}
 
 	/** Fires all the clients, except for a selected one or a specific group. */
 	public SendWithout(player: Player | Player[], ...args: Parameters<F>) {
-		if (!assertRemoteType("RemoteEvent", this.remote)) return;
+		if (!!IS_RUNNING || !assertRemoteType("RemoteEvent", this.remote)) return;
 		const players = new Set(this.resolvePlayerList(player));
 
 		this.Send(
@@ -171,21 +166,21 @@ class ServerDispatcher<F extends Callback> {
 	}
 }
 
-const mt = ServerDispatcher as LuaMetatable<ServerDispatcher<Callback>>;
-mt.__call = (Self, ...a) => {
+(ServerDispatcher as LuaMetatable<ServerDispatcher<Callback>>).__call = (Self, ...a) => {
 	const args = [...a];
 	const kind = Self["definition"].Kind;
 
 	if (kind === "Event") {
 		const player = (args as [Player | Player[]]).shift()!;
 
-		Self.Send(player, ...args);
-		return;
+		return Self.Send(player, ...args);
 	} else if (kind === "AsyncFunction") {
 		const player = (args as [Player]).shift()!;
 
 		return Self.CallAsync(player, ...args);
 	}
+
+	netBuilderError("ServerFunctions cannot be called.");
 };
 
 export = ServerDispatcher;
