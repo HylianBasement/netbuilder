@@ -6,6 +6,7 @@ import {
 	InferDefinitionTyping,
 	NetBuilderAsyncReturn,
 	NetBuilderResult,
+	ServerDefinition,
 	ThreadResult,
 	UnwrapAsyncReturnType,
 } from "../definitions";
@@ -19,8 +20,8 @@ import isRemoteFunction from "../Util/isRemoteFunction";
 import netBuilderError from "../Util/netBuilderError";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import promiseYield from "../Util/promiseYield";
+import { IS_SERVER } from "../Util/boundary";
 
-const RunService = game.GetService("RunService");
 const Players = game.GetService("Players");
 
 /** Definition manager responsible for processing server events and functions. */
@@ -31,64 +32,12 @@ class ServerDispatcher<F extends Callback> {
 
 	private readonly warningTimeout = 15;
 
-	private constructor(private readonly definition: DefinitionMembers) {
-		if (!RunService.IsServer()) {
+	public constructor(private readonly definition: DefinitionMembers) {
+		if (!IS_SERVER) {
 			netBuilderError("This dispatcher can be only created on the server.", 3);
 		}
 
 		this.remote = RemoteResolver.For<F>(definition as never, true);
-	}
-
-	private static create(definition: Definition, kind: DefinitionKind) {
-		const def = definition as unknown as DefinitionMembers;
-
-		if (def.Kind !== kind) {
-			netBuilderError(`Expected ${kind}, got ${def.Kind}.`, 3);
-		}
-
-		return new ServerDispatcher(def);
-	}
-
-	/**
-	 * Creates a server dispatcher exclusive to events.
-	 *
-	 * @server
-	 */
-	public static CreateEvent<R extends Definition>(
-		definition: InferDefinitionKind<R> extends "Event" ? R : never,
-	) {
-		return this.create(definition, "Event") as unknown as Omit<
-			ServerDispatcher<InferDefinitionTyping<R>>,
-			"SetCallback" | "CallAsync"
-		>;
-	}
-
-	/**
-	 * Creates a server dispatcher exclusive to functions.
-	 *
-	 * @server
-	 */
-	public static CreateFunction<R extends Definition>(
-		definition: InferDefinitionKind<R> extends "Function" ? R : never,
-	) {
-		return this.create(definition, "Function") as unknown as Omit<
-			ServerDispatcher<InferDefinitionTyping<R>>,
-			"Connect" | "CallAsync" | "Send" | "SendToAll" | "SendWithout"
-		>;
-	}
-
-	/**
-	 * Creates a server dispatcher exclusive to asynchronous functions.
-	 *
-	 * @server
-	 */
-	public static CreateAsyncFunction<R extends Definition>(
-		definition: InferDefinitionKind<R> extends "AsyncFunction" ? R : never,
-	) {
-		return this.create(definition, "AsyncFunction") as unknown as Omit<
-			ServerDispatcher<InferDefinitionTyping<R>>,
-			"Connect" | "Send" | "SendToAll" | "SendWithout"
-		>;
 	}
 
 	private resolvePlayerList(playerOrPlayers: Player | Player[]) {
@@ -131,7 +80,7 @@ class ServerDispatcher<F extends Callback> {
 
 				return {
 					Type: "Ok",
-					Value: resultFn(returnResult.Value),
+					Data: resultFn(returnResult.Data),
 				} as NetBuilderResult<UnwrapAsyncReturnType<F>>;
 			},
 			(msg) => ({
@@ -147,7 +96,7 @@ class ServerDispatcher<F extends Callback> {
 			const result = this.rawCall(player, args);
 
 			if (result.Type === "Ok") {
-				res(result.Value);
+				res(result.Data);
 			} else {
 				rej(result.Message);
 			}
@@ -176,13 +125,9 @@ class ServerDispatcher<F extends Callback> {
 		}
 	}
 
-	/** Fires all the clients. */
-	public SendToAll(useMiddleware: boolean, ...args: Parameters<F>) {
+	/** Fires all the clients. **(Does not use middlewares)** */
+	public SendToAll(...args: Parameters<F>) {
 		if (!assertRemoteType("RemoteEvent", this.remote)) return;
-
-		if (useMiddleware) {
-			return this.SendWithout([], ...(args as never));
-		}
 
 		this.remote.FireAllClients(...(args as never));
 	}
@@ -225,5 +170,22 @@ class ServerDispatcher<F extends Callback> {
 		remote.OnServerInvoke = Middleware.CreateReceiver(this.definition, callback);
 	}
 }
+
+const mt = ServerDispatcher as LuaMetatable<ServerDispatcher<Callback>>;
+mt.__call = (Self, ...a) => {
+	const args = [...a];
+	const kind = Self["definition"].Kind;
+
+	if (kind === "Event") {
+		const player = (args as [Player | Player[]]).shift()!;
+
+		Self.Send(player, ...args);
+		return;
+	} else if (kind === "AsyncFunction") {
+		const player = (args as [Player]).shift()!;
+
+		return Self.CallAsync(player, ...args);
+	}
+};
 
 export = ServerDispatcher;

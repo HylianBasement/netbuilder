@@ -9,6 +9,7 @@ import {
 	DefinitionKind,
 	InferDefinitionKind,
 	NetBuilderAsyncReturn,
+	ClientDefinition,
 } from "../definitions";
 
 import Middleware from "../Internal/Middleware";
@@ -20,8 +21,8 @@ import isRemoteFunction from "../Util/isRemoteFunction";
 import netBuilderError from "../Util/netBuilderError";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import promiseYield from "../Util/promiseYield";
+import { IS_CLIENT } from "../Util/boundary";
 
-const RunService = game.GetService("RunService");
 const player = game.GetService("Players").LocalPlayer;
 
 /** Definition manager responsible for processing client events and async functions. */
@@ -32,64 +33,12 @@ class ClientDispatcher<F extends Callback> {
 
 	private readonly warningTimeout = 15;
 
-	private constructor(private readonly definition: DefinitionMembers) {
-		if (!RunService.IsClient()) {
+	public constructor(private readonly definition: DefinitionMembers) {
+		if (!IS_CLIENT) {
 			netBuilderError("This dispatcher can be only created on the client.", 3);
 		}
 
 		this.remote = RemoteResolver.Request<F>(definition);
-	}
-
-	private static get(definition: Definition, kind: DefinitionKind) {
-		const def = definition as unknown as DefinitionMembers;
-
-		if (def.Kind !== kind) {
-			netBuilderError(`Expected ${kind}, got ${def.Kind}.`, 3);
-		}
-
-		return new ClientDispatcher(def);
-	}
-
-	/**
-	 * Creates a client dispatcher exclusive to events.
-	 *
-	 * @client
-	 */
-	public static GetEvent<R extends Definition>(
-		definition: InferDefinitionKind<R> extends "Event" ? R : never,
-	) {
-		return this.get(definition, "Event") as unknown as Omit<
-			ClientDispatcher<InferDefinitionTyping<R>>,
-			"SetCallback" | "Call" | "CallAsync" | "RawCall" | "CallWith"
-		>;
-	}
-
-	/**
-	 * Creates a client dispatcher exclusive to functions.
-	 *
-	 * @client
-	 */
-	public static GetFunction<R extends Definition>(
-		definition: InferDefinitionKind<R> extends "Function" ? R : never,
-	) {
-		return this.get(definition, "Function") as unknown as Omit<
-			ClientDispatcher<InferDefinitionTyping<R>>,
-			"Connect" | "CallAsync" | "Send"
-		>;
-	}
-
-	/**
-	 * Creates a client dispatcher exclusive to asynchronous functions.
-	 *
-	 * @client
-	 */
-	public static GetAsyncFunction<R extends Definition>(
-		definition: InferDefinitionKind<R> extends "AsyncFunction" ? R : never,
-	) {
-		return this.get(definition, "AsyncFunction") as unknown as Omit<
-			ClientDispatcher<InferDefinitionTyping<R>>,
-			"Connect" | "Call" | "RawCall" | "CallWith" | "Send"
-		>;
 	}
 
 	private toString() {
@@ -109,7 +58,7 @@ class ClientDispatcher<F extends Callback> {
 		const result = this.RawCall(...(args as never));
 
 		if (result.Type === "Ok") {
-			return result.Value;
+			return result.Data;
 		}
 
 		netBuilderError(result.Message, 3);
@@ -121,7 +70,7 @@ class ClientDispatcher<F extends Callback> {
 			const result = this.RawCall(...(args as never));
 
 			if (result.Type === "Ok") {
-				res(result.Value);
+				res(result.Data);
 			} else {
 				rej(result.Message);
 			}
@@ -169,7 +118,7 @@ class ClientDispatcher<F extends Callback> {
 
 				return {
 					Type: "Ok",
-					Value: resultFn(returnResult.Value),
+					Data: resultFn(returnResult.Data),
 				} as NetBuilderResult<UnwrapAsyncReturnType<F>>;
 			},
 			(msg) => ({
@@ -231,5 +180,19 @@ class ClientDispatcher<F extends Callback> {
 		remote.OnClientInvoke = Middleware.CreateReceiver(this.definition, callback) as F;
 	}
 }
+
+const mt = ClientDispatcher as LuaMetatable<ClientDispatcher<Callback>>;
+mt.__call = (Self, ...args) => {
+	const kind = Self["definition"].Kind;
+
+	if (kind === "Event") {
+		Self.Send(...args);
+		return;
+	} else if (kind === "Function") {
+		return Self.Call(...args);
+	}
+
+	return Self.CallAsync(...args);
+};
 
 export = ClientDispatcher;

@@ -1,5 +1,8 @@
 import { Result } from "@rbxts/rust-classes";
 
+import ClientDispatcher from "./Boundary/ClientDispatcher";
+import ServerDispatcher from "./Boundary/ServerDispatcher";
+
 export type ArrayLength<T extends Array<any> | ReadonlyArray<any>> = (T & { length: number })["length"];
 
 export type LengthEquals<
@@ -76,7 +79,7 @@ export type SerializableObject = NetBuilderSerializer<defined> | SerializableCla
 export type NetBuilderResult<T> =
 	| {
 			Type: "Ok";
-			Value: T;
+			Data: T;
 	  }
 	| {
 			Type: "Err";
@@ -127,6 +130,7 @@ export interface DefinitionMembers {
 	readonly Middlewares: ReadonlyArray<NetBuilderMiddleware>;
 	readonly Checks: readonly [ReadonlyArray<Check<any>>, Check<any>];
 	readonly Namespace: DefinitionNamespace;
+	readonly Timeout: number;
 }
 
 export interface DefinitionNamespace {
@@ -155,6 +159,34 @@ export interface LoggingDefinition {
 	readonly Id: string;
 	readonly Kind: DefinitionKind;
 }
+
+export type ClientDefinition<K extends DefinitionKind, D> = D extends ClientDispatcher<any>
+	? K extends "Event"
+		? { (this: void, ...args: Parameters<D["Send"]>): void } & Omit<
+				D,
+				"SetCallback" | "Call" | "CallAsync" | "RawCall" | "CallWith"
+		  >
+		: K extends "Function"
+		? { (this: void, ...args: Parameters<D["Call"]>): ReturnType<D["Call"]> } & Omit<
+				D,
+				"Connect" | "CallAsync" | "Send"
+		  >
+		: { (this: void, ...args: Parameters<D["CallAsync"]>): ReturnType<D["CallAsync"]> } & Omit<
+				D,
+				"Connect" | "Call" | "RawCall" | "CallWith" | "Send"
+		  >
+	: never;
+
+export type ServerDefinition<K extends DefinitionKind, D> = D extends ServerDispatcher<any>
+	? K extends "Event"
+		? { (this: void, ...args: Parameters<D["Send"]>): void } & Omit<D, "SetCallback" | "CallAsync">
+		: K extends "Function"
+		? Omit<D, "Connect" | "CallAsync" | "Send" | "SendToAll" | "SendWithout">
+		: { (this: void, ...args: Parameters<D["CallAsync"]>): ReturnType<D["CallAsync"]> } & Omit<
+				D,
+				"Connect" | "Send" | "SendToAll" | "SendWithout"
+		  >
+	: never;
 
 export type InferDefinitionId<R> = R extends Definition<infer I, never, never> ? I : never;
 

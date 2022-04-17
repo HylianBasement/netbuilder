@@ -10,12 +10,13 @@ import {
 } from "../definitions";
 
 import Serialization from "./Serialization";
+import TypeChecking from "./TypeChecking";
 
 import GlobalMiddleware from "../Symbol/GlobalMiddleware";
 
 import definitionInfo from "../Util/definitionInfo";
 import netBuilderWarn from "../Util/netBuilderWarn";
-import TypeChecking from "./TypeChecking";
+import { IS_SERVER } from "../Util/boundary";
 
 interface MiddlewareEntry {
 	CurrentParameters: ReadonlyArray<unknown>;
@@ -23,10 +24,7 @@ interface MiddlewareEntry {
 	Result: ThreadResult;
 }
 
-const RunService = game.GetService("RunService");
 const Players = game.GetService("Players");
-
-const IS_SERVER = RunService.IsServer();
 
 /** @internal */
 namespace Middleware {
@@ -95,7 +93,7 @@ namespace Middleware {
 
 				return {
 					Type: "Ok",
-					Value: state.ReturnCallbacks.reduce((acc, fn) => fn(acc), returnValue),
+					Data: state.ReturnCallbacks.reduce((acc, fn) => fn(acc), returnValue),
 				};
 			}
 
@@ -129,7 +127,7 @@ namespace Middleware {
 
 			return {
 				Type: "Ok",
-				Value: Serialization.Serialize(
+				Data: Serialization.Serialize(
 					definition.Namespace,
 					Serialization.Deserialize(definition.Namespace, returnValue),
 				),

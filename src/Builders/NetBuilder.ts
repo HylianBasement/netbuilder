@@ -1,3 +1,5 @@
+import { OptionMut } from "@rbxts/rust-classes";
+
 import {
 	InferDefinitionId,
 	NetBuilderMiddleware,
@@ -11,7 +13,17 @@ import {
 	SerializableObject,
 	SerializationType,
 	SerializationMap as ISerializationMap,
+	InferDefinitionTyping,
+	DefinitionKind,
+	InferDefinitionKind,
+	ServerDefinition,
+	ClientDefinition,
 } from "../definitions";
+
+import ConfigurationBuilder from "./ConfigurationBuilder";
+
+import ServerDispatcher from "../Boundary/ServerDispatcher";
+import ClientDispatcher from "../Boundary/ClientDispatcher";
 
 import Serialization from "../Internal/Serialization";
 
@@ -24,6 +36,28 @@ import Serializers from "../Symbol/Serializers";
 import SerializationMap from "../Symbol/SerializationMap";
 
 import netBuilderError from "../Util/netBuilderError";
+import { IS_CLIENT, IS_SERVER } from "../Util/boundary";
+
+const enum Boundary {
+	Server,
+	Client,
+}
+
+type NetBuilderServer<R extends DefinitionNamespace> = {
+	[I in keyof R]: R[I] extends Definition
+		? ServerDefinition<InferDefinitionKind<R[I]>, ServerDispatcher<InferDefinitionTyping<R[I]>>>
+		: R[I] extends DefinitionNamespace
+		? NetBuilderServer<R[I]>
+		: never;
+};
+
+type NetBuilderClient<R extends DefinitionNamespace> = {
+	[I in keyof R]: R[I] extends Definition
+		? ClientDefinition<InferDefinitionKind<R[I]>, ClientDispatcher<InferDefinitionTyping<R[I]>>>
+		: R[I] extends DefinitionNamespace
+		? NetBuilderClient<R[I]>
+		: never;
+};
 
 type NetBuilderMiddlewareOptions = {
 	Global?: boolean;
@@ -44,7 +78,10 @@ interface NetBuilderSerializerCreator<S> {
 	Deserialize(this: void, serialized: S): defined;
 }
 
-const RunService = game.GetService("RunService");
+interface Cache<R extends DefinitionNamespace> {
+	Client: OptionMut<R>;
+	Server: OptionMut<R>;
+}
 
 const middlewareFn: MiddlewareCallback<Callback> =
 	(_remote, processNext) =>
@@ -66,7 +103,12 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 
 	private serializers = new Array<NetBuilderSerializer<defined>>();
 
-	private serializationMap: ISerializationMap = {
+	private readonly cache: Cache<R> = {
+		Server: OptionMut.none<R>(),
+		Client: OptionMut.none<R>(),
+	};
+
+	private readonly serializationMap: ISerializationMap = {
 		Serializables: new Map(),
 		Serializers: new Map(),
 		SerializerClasses: new Map(),
@@ -91,7 +133,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 				const serverFn: MiddlewareCallback<Callback> =
 					(definition, processNext, drop) =>
 					(player, ...args) => {
-						if (player && RunService.IsServer()) {
+						if (player && IS_SERVER) {
 							Callback(definition, processNext, drop)(player, ...(args as never[]));
 						} else {
 							processNext(args);
@@ -139,6 +181,29 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 		};
 	}
 
+	private createDispatchers(boundary: Boundary, dict: Map<string, Definition | DefinitionNamespace>) {
+		const Dispatcher = boundary === Boundary.Server ? ServerDispatcher : ClientDispatcher;
+
+		function assign(
+			input: Map<string, Definition | DefinitionNamespace>,
+			output: Record<string, defined>,
+		) {
+			for (const [k, v] of input) {
+				if (type(k) === "string") {
+					if ("Id" in v && "Kind" in v) {
+						output[k] = new Dispatcher(v as never);
+					} else {
+						output[k] = assign(v as never, {});
+					}
+				}
+			}
+
+			return output;
+		}
+
+		return assign(dict, {});
+	}
+
 	/** Adds a definition to the namespace. */
 	public AddDefinition<D extends Definition>(definition: D) {
 		this.definitions.push(definition);
@@ -153,14 +218,26 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 		return this as unknown as NetBuilder<R & { readonly [_ in S]: N }, O>;
 	}
 
-	/** Sets the root instance of the remotes from the namespace. */
+	public Configure(config: ((builder: ConfigurationBuilder) => object) | NetBuilderConfiguration) {
+		this.configuration = typeIs(config, "function")
+			? (config(new ConfigurationBuilder()) as ConfigurationBuilder)["Build"]()
+			: { ...this.configuration, ...config };
+
+		return this as unknown as NetBuilder<R, O>;
+	}
+
+	/** Sets the root instance of the remotes from the namespace.
+	 * @deprecated
+	 */
 	public SetRoot(instance: Instance | ((replicatedStorage: ReplicatedStorage) => Instance)) {
 		this.configuration.RootInstance = instance;
 
 		return this as unknown as Omit<NetBuilder<R, O | "SetRoot">, O | "SetRoot">;
 	}
 
-	/** Disables the warnings emitted from the namespace. */
+	/** Disables the warnings emitted from the namespace.
+	 * @deprecated
+	 */
 	public SupressWarnings(value = true) {
 		this.configuration.SuppressWarnings = value;
 
@@ -201,8 +278,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 		return this as unknown as Omit<NetBuilder<R, O | "WithSerialization">, O | "WithSerialization">;
 	}
 
-	/** Returns a dictionary of remote definitions. */
-	public Build() {
+	private _build() {
 		const { definitions, namespaces } = this;
 		const dict = new Map<string, Definition | DefinitionNamespace>();
 
@@ -222,13 +298,8 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 		}
 
 		for (const { name, space } of namespaces) {
-			space[NamespaceId] ??= name;
-			space[NamespaceParent] ??= dict;
-			space[GlobalMiddleware] ??= this.middlewareList;
-			space[Serializables] ??= this.serializableClasses;
-			space[Serializers] ??= this.serializers;
-			space[SerializationMap] ??= this.serializationMap;
-
+			space[NamespaceId] = name;
+			space[NamespaceParent] = dict;
 			space[Configuration] = space[Configuration]
 				? { ...this.configuration, ...(space[Configuration] as NetBuilderConfiguration) }
 				: this.configuration;
@@ -245,7 +316,53 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 		thisNamespace[Serializers] = this.serializers;
 		thisNamespace[SerializationMap] = this.serializationMap;
 
-		return dict as unknown as R;
+		return dict;
+	}
+
+	/** Returns a dictionary of remote definitions. */
+	public AsNamespace() {
+		return this._build() as unknown as R;
+	}
+
+	/** Generates dispatchers for each side. */
+	public Build() {
+		const { cache } = this;
+		const dict = this._build();
+
+		return {
+			/** Generated server dispatchers */
+			Server: setmetatable(
+				{},
+				{
+					__tostring: () => "NetBuilder.ServerDefinitions",
+					__index: (_, key) => {
+						if (!IS_SERVER) {
+							netBuilderError("Cannot access server definitions from a client.");
+						}
+
+						return cache.Server.getOrInsertWith(
+							() => this.createDispatchers(Boundary.Server, dict) as never,
+						)[key as keyof R];
+					},
+				},
+			) as NetBuilderServer<R>,
+			/** Generated client dispatchers */
+			Client: setmetatable(
+				{},
+				{
+					__tostring: () => "NetBuilder.ClientDefinitions",
+					__index: (_, key) => {
+						if (!IS_CLIENT) {
+							netBuilderError("Cannot access client definitions from the server.");
+						}
+
+						return cache.Client.getOrInsertWith(
+							() => this.createDispatchers(Boundary.Client, dict) as never,
+						)[key as keyof R];
+					},
+				},
+			) as NetBuilderClient<R>,
+		} as const;
 	}
 }
 

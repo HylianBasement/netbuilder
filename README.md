@@ -65,33 +65,33 @@ Return value type checkers are set via `SetReturn`. For the type checkers, it's 
 It's also possible to add a namespace that contains another dictionary of remote definitions created by a `NetBuilder` class.
 
 ```js
-import { NetBuilder, EventBuilder, FunctionBuilder } from "@rbxts/netbuilder";
+import { NetBuilder, DefinitionBuilder } from "@rbxts/netbuilder";
 
 export = new NetBuilder()
-	.AddDefinition(new EventBuilder("PrintMessage").SetArguments(t.string).Build())
+	.AddDefinition(new DefinitionBuilder("PrintMessage").SetArguments(t.string).Build())
 	.AddDefinition(
-		new FunctionBuilder("Sum").SetArguments(t.number, t.number).SetReturn(t.number).Build(),
+		new DefinitionBuilder("Sum").SetArguments(t.number, t.number).SetReturn(t.number).Build(),
 	)
 	.AddNamespace(
 		"Player",
 		new NetBuilder()
-			.AddDefinition(new EventBuilder("ConsumeItem").SetArguments(t.number).Build())
-			.AddDefinition(new FunctionBuilder("GetStatus").SetReturn(t.PlayerStatus).Build())
-			.Build(),
+			.AddDefinition(new DefinitionBuilder("ConsumeItem").SetArguments(t.number).Build())
+			.AddDefinition(new DefinitionBuilder("GetStatus").SetReturn(t.PlayerStatus).Build())
+			.AsNamespace(),
 	)
 	.AddNamespace(
 		"Party",
 		new NetBuilder()
 			.AddDefinition(
-				new FunctionBuilder("Create")
+				new DefinitionBuilder("Create")
 					.SetArguments(t.PartyInfoCreator)
 					.SetReturn(t.Party)
 					.Build(),
 			)
-			.AddDefinition(new FunctionBuilder("Disband").SetArguments(t.number).Build())
-			.AddDefinition(new EventBuilder("SendJoinRequest").SetArguments(t.number).Build())
-			.AddDefinition(new EventBuilder("SendInvite").SetArguments(t.number, t.number).Build())
-			.Build(),
+			.AddDefinition(new DefinitionBuilder("Disband").SetArguments(t.number).Build())
+			.AddDefinition(new DefinitionBuilder("SendJoinRequest").SetArguments(t.number).Build())
+			.AddDefinition(new DefinitionBuilder("SendInvite").SetArguments(t.number, t.number).Build())
+			.AsNamespace(),
 	)
 	.Build();
 ```
@@ -103,22 +103,17 @@ To use the definitions we have stored, there are dispatchers for both sides that
 
 ```js
 // Client-side
-import { Client } from "@rbxts/netbuilder";
-import { Player, PrintMessage } from "shared/Remotes";
+import { Client } from "shared/Remotes";
 
-const printMessageEvent = Client.GetEvent(PrintMessage);
-const playerStatusEvent = Client.GetFunction(Player.GetStatus);
-
-printMessageEvent.Send("Hello world!");
-playerStatusEvent.Call(); // { Level: 1, Atk: 25, Def: 10 }
+Client.PrintMessage.Send("Hello world!");
+Client.Player.GetStatus.Call(); // { Level: 1, Atk: 25, Def: 10 }
 
 // Server-side
-import { Server } from "@rbxts/netbuilder";
-import { Player, PrintMessage } from "shared/Remotes";
+import { Server } from "shared/Remotes";
 import getPlayerStatus from "shared/PlayerData";
 
-Server.CreateEvent(PrintMessage).Connect(print);
-Server.CreateFunction(Player.GetStatus).SetCallback(getPlayerStatus);
+Server.PrintMessage.Connect(print);
+Server.Player.GetStatus.SetCallback(getPlayerStatus);
 ```
 
 Once the game starts, the remote instances are automatically generated in a folder named `NetBuilderRemotes`, located in `ReplicatedStorage`. A way to change the location of the instances will be explained later.
@@ -140,13 +135,17 @@ Current available fields for configuration are:
 
 ```js
 new NetBuilder()
-	.SetRoot((rs) => rs.WaitForChild("MyRemotes"))
+	.Configure({
+		RootInstance: (rs) => rs.WaitForChild("MyRemotes"),
+	})
 	.SupressWarnings()
 	.AddNamespace("Foo",
 		new NetBuilder()
-			.SetRoot((rs) => rs.WaitForChild("FooRemotes"))
+			.Configure({
+				RootInstance: (rs) => rs.WaitForChild("FooRemotes"),
+			})
 			// ...
-			.Build(),
+			.AsNamespace(),
 	)
 	// ...
 	.Build();
@@ -162,7 +161,7 @@ The middlewares used in the below example are `RateLimiter`, which limits how ma
 ```js
 new NetBuilder()
 	.AddDefinition(
-		new EventBuilder("Print")
+		new DefinitionBuilder("Print")
 			.SetArguments(t.string)
 			.WithMiddleware([
 				RateLimiter({ MaxPerMinute: 10 }),
@@ -187,16 +186,16 @@ new NetBuilder()
 		),
 	])
 	.AddDefinition(
-		new EventBuilder("Print")
+		new DefinitionBuilder("Print")
 			.SetArguments(t.string)
 			.WithMiddleware([RateLimiter({ MaxPerMinute: 5 })])
-			.Build()
+			.AsNamespace()
 	)
 	.AddDefinition(
-		new FunctionBuilder("Sum")
+		new DefinitionBuilder("Sum")
 			.SetArguments(t.number, t.number)
 			.SetReturn(t.number)
-			.Build()
+			.AsNamespace()
 	)
 	.Build();
 ```
@@ -236,7 +235,7 @@ const LegacySystem = NetBuilder.CreateMiddleware<[errMessage: string]>(
 export = LegacySystem;
 
 // Remotes.ts
-export = new EventBuilder("Hello")
+export = new DefinitionBuilder("Hello")
 	.WithMiddleware([LegacySystem("This is a very old system, period.")])
 	.Build();
 ```
@@ -331,7 +330,7 @@ import RustResult from "../Serializer/RustResult";
 export = new NetBuilder()
 	.WithSerialization([Person, RustResult])
 	.AddDefinition(
-		new FunctionBuilder("Introduction")
+		new DefinitionBuilder("Introduction")
 			.SetArguments(t.Person)
 			.SetReturn(t.RustResult)
 			.Build()
