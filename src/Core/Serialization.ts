@@ -12,9 +12,13 @@ import Serializables from "../Symbol/Serializables";
 import Serializers from "../Symbol/Serializers";
 import SerializationMap from "../Symbol/SerializationMap";
 
+import symbolDictionary from "../Util/symbolDictionary";
+
+/** @internal */
 namespace Serialization {
 	export function Serialize(namespace: DefinitionNamespace, value: defined) {
-		const map = namespace[SerializationMap] as ISerializationMap;
+		const symbols = symbolDictionary(namespace);
+		const map = symbols[SerializationMap] as ISerializationMap;
 
 		const mt = getmetatable(value) as never;
 		const serializer = map.SerializerClasses.get(mt)?.Serializer;
@@ -26,9 +30,9 @@ namespace Serialization {
 		return isSerializableClassInstance(namespace, value)
 			? {
 					SerializationType: SerializationType.Implemented,
-					SerializationId: (
-						namespace[SerializationMap] as ISerializationMap
-					).Serializables.get(mt)!,
+					SerializationId: (symbols[SerializationMap] as ISerializationMap).Serializables.get(
+						mt,
+					)!,
 					Value: "Serialize" in value ? value.Serialize() : value.serialize(),
 			  }
 			: value;
@@ -39,8 +43,10 @@ namespace Serialization {
 			return value;
 		}
 
+		const symbols = symbolDictionary(namespace);
+
 		if (value.SerializationType === SerializationType.Implemented) {
-			const serializables = namespace[Serializables] as Array<SerializableClass>;
+			const serializables = symbols[Serializables] as Array<SerializableClass>;
 			const mt = serializables[value.SerializationId - 1];
 
 			return "deserialize" in mt
@@ -52,7 +58,7 @@ namespace Serialization {
 				  ).Deserialize(value.Value);
 		}
 
-		const serializers = namespace[Serializers] as Array<NetBuilderSerializer<defined>>;
+		const serializers = symbols[Serializers] as Array<NetBuilderSerializer<defined>>;
 
 		return serializers[value.SerializationId - 1].Deserialization(value.Value);
 	}
@@ -86,7 +92,7 @@ namespace Serialization {
 			return false;
 		}
 
-		const map = namespace[SerializationMap] as ISerializationMap;
+		const map = symbolDictionary(namespace)[SerializationMap] as ISerializationMap;
 
 		return map.Serializables.has(mt);
 	}

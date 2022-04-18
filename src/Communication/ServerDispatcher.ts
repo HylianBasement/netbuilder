@@ -1,7 +1,10 @@
+import { OptionMut } from "@rbxts/rust-classes";
+
 import {
 	DefinitionMembers,
 	NetBuilderAsyncReturn,
 	NetBuilderResult,
+	Remote,
 	ThreadResult,
 	UnwrapAsyncReturnType,
 } from "../definitions";
@@ -19,9 +22,11 @@ import { IS_RUNNING, IS_SERVER } from "../Util/boundary";
 
 const Players = game.GetService("Players");
 
-/** Definition manager responsible for processing server events and functions. */
+/** Definition manager responsible for processing server events and functions.
+ * @internal
+ */
 class ServerDispatcher<F extends Callback> {
-	private remote;
+	private readonly remote = OptionMut.none<Remote<F>>();
 
 	private readonly timeout = 60;
 
@@ -31,8 +36,10 @@ class ServerDispatcher<F extends Callback> {
 		if (!IS_SERVER) {
 			netBuilderError("This dispatcher can be only created on the server.", 3);
 		}
+	}
 
-		this.remote = RemoteResolver.For<F>(definition as never, true);
+	private getOrCreateRemote() {
+		return this.remote.getOrInsertWith(() => RemoteResolver.For<F>(this.definition as never, true));
 	}
 
 	private resolvePlayerList(playerOrPlayers: Player | Player[]) {
@@ -42,7 +49,7 @@ class ServerDispatcher<F extends Callback> {
 	}
 
 	private toString() {
-		return `ServerDispatcher<${this.definition.Kind}>`;
+		return `NetBuilder.ServerDispatcher<${this.definition.Kind}>`;
 	}
 
 	private timeoutMsg() {
@@ -54,7 +61,8 @@ class ServerDispatcher<F extends Callback> {
 	}
 
 	private rawCall(player: Player, args: unknown[]): NetBuilderResult<UnwrapAsyncReturnType<F>> {
-		const { remote, definition } = this;
+		const remote = this.getOrCreateRemote();
+		const { definition } = this;
 
 		if (!remote || !isRemoteFunction(remote)) {
 			netBuilderError(`Expected RemoteFunction, got ${remote ? "RemoteEvent" : "nil"}.`, 3);
@@ -107,13 +115,15 @@ class ServerDispatcher<F extends Callback> {
 
 	/** Fires a client event for a player or a specific group of clients. */
 	public Send(player: Player | Player[], ...args: Parameters<F>) {
-		if (!IS_RUNNING || !assertRemoteType("RemoteEvent", this.remote)) return;
+		const remote = this.getOrCreateRemote();
+
+		if (!IS_RUNNING || !assertRemoteType("RemoteEvent", remote)) return;
 
 		for (const plr of this.resolvePlayerList(player)) {
 			const result = Middleware.CreateSender(plr, this.definition, ...(args as unknown[]));
 
 			if (result.isOk()) {
-				return this.remote.FireClient(plr, ...(result.unwrap()[0] as never));
+				return remote.FireClient(plr, ...(result.unwrap()[0] as never));
 			}
 
 			netBuilderError(result.unwrapErr(), 3);
@@ -122,14 +132,17 @@ class ServerDispatcher<F extends Callback> {
 
 	/** Fires all the clients. **(Does not use middlewares)** */
 	public SendToAll(...args: Parameters<F>) {
-		if (!IS_RUNNING || !assertRemoteType("RemoteEvent", this.remote)) return;
+		const remote = this.getOrCreateRemote();
 
-		this.remote.FireAllClients(...(args as never));
+		if (!IS_RUNNING || !assertRemoteType("RemoteEvent", remote)) return;
+
+		remote.FireAllClients(...(args as never));
 	}
 
 	/** Fires all the clients, except for a selected one or a specific group. */
 	public SendWithout(player: Player | Player[], ...args: Parameters<F>) {
-		if (!!IS_RUNNING || !assertRemoteType("RemoteEvent", this.remote)) return;
+		if (!!IS_RUNNING || !assertRemoteType("RemoteEvent", this.getOrCreateRemote())) return;
+
 		const players = new Set(this.resolvePlayerList(player));
 
 		this.Send(
@@ -140,7 +153,7 @@ class ServerDispatcher<F extends Callback> {
 
 	/** Connects a listener callback that is called whenever new data is received from a client. */
 	public Connect(callback: (player: Player, ...args: Parameters<F>) => void | Promise<void>) {
-		const { remote } = this;
+		const remote = this.getOrCreateRemote();
 
 		if (isRemoteFunction(remote)) {
 			netBuilderError("Expected ServerEvent, got Function.", 3);
@@ -156,7 +169,7 @@ class ServerDispatcher<F extends Callback> {
 			...args: Parameters<F>
 		) => ReturnType<F> extends Promise<any> ? ReturnType<F> : ReturnType<F> | Promise<ReturnType<F>>,
 	) {
-		const { remote } = this;
+		const remote = this.getOrCreateRemote();
 
 		if (!isRemoteFunction(remote)) {
 			netBuilderError("Expected ServerFunction, got ServerEvent.", 3);
@@ -180,7 +193,7 @@ class ServerDispatcher<F extends Callback> {
 		return Self.CallAsync(player, ...args);
 	}
 
-	netBuilderError("ServerFunctions cannot be called.");
+	netBuilderError("Direct calls are not supported for Functions.");
 };
 
 export = ServerDispatcher;

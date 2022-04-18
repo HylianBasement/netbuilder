@@ -20,9 +20,11 @@ import { IS_CLIENT } from "../Util/boundary";
 
 const player = game.GetService("Players").LocalPlayer;
 
-/** Definition manager responsible for processing client events and async functions. */
+/** Definition manager responsible for processing client events and async functions.
+ * @internal
+ */
 class ClientDispatcher<F extends Callback> {
-	private readonly remote: Remote<F> | undefined;
+	private remote: Remote<F> | undefined;
 
 	private readonly timeout = 60;
 
@@ -32,12 +34,14 @@ class ClientDispatcher<F extends Callback> {
 		if (!IS_CLIENT) {
 			netBuilderError("This dispatcher can be only created on the client.", 3);
 		}
+	}
 
-		this.remote = RemoteResolver.Request<F>(definition);
+	private tryFindRemote() {
+		return (this.remote ??= RemoteResolver.Request<F>(this.definition));
 	}
 
 	private toString() {
-		return `ClientDispatcher<${this.definition.Kind}>`;
+		return `NetBuilder.ClientDispatcher<${this.definition.Kind}>`;
 	}
 
 	private timeoutMsg() {
@@ -89,7 +93,8 @@ class ClientDispatcher<F extends Callback> {
 
 	/** Calls the server synchronously and returns a result object containing its status and value/error message. */
 	public RawCall(...args: Parameters<F>): NetBuilderResult<UnwrapAsyncReturnType<F>> {
-		const { remote, definition } = this;
+		const remote = this.tryFindRemote();
+		const { definition } = this;
 
 		if (!remote || !isRemoteFunction(remote)) {
 			netBuilderError(`Expected RemoteFunction, got ${remote ? "RemoteEvent" : "nil"}.`, 3);
@@ -125,7 +130,7 @@ class ClientDispatcher<F extends Callback> {
 
 	/** Sends a request to the server with the given arguments. */
 	public Send(...args: Parameters<F>) {
-		const { remote } = this;
+		const remote = this.tryFindRemote();
 
 		if (!assertRemoteType("RemoteEvent", remote)) return;
 
@@ -144,7 +149,7 @@ class ClientDispatcher<F extends Callback> {
 			netBuilderError("Client functions are not supported!", 3);
 		}
 
-		const { remote } = this;
+		const remote = this.tryFindRemote();
 
 		if (!remote) return;
 
@@ -162,7 +167,7 @@ class ClientDispatcher<F extends Callback> {
 			...args: Parameters<F>
 		) => ReturnType<F> extends Promise<any> ? ReturnType<F> : ReturnType<F> | Promise<ReturnType<F>>,
 	) {
-		const { remote } = this;
+		const remote = this.tryFindRemote();
 
 		if (!remote) return;
 

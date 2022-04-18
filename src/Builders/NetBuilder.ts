@@ -35,6 +35,7 @@ import Serializers from "../Symbol/Serializers";
 import SerializationMap from "../Symbol/SerializationMap";
 
 import netBuilderError from "../Util/netBuilderError";
+import symbolDictionary from "../Util/symbolDictionary";
 import { IS_CLIENT, IS_SERVER } from "../Util/boundary";
 
 const enum Boundary {
@@ -169,7 +170,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 				return {
 					SerializationType: SerializationType.Custom,
 					SerializationId: (
-						namespace[SerializationMap] as ISerializationMap
+						symbolDictionary(namespace)[SerializationMap] as ISerializationMap
 					).SerializerClasses.get(object as never)!.Id,
 					Value: methods.Serialize(value),
 				};
@@ -197,6 +198,8 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 				}
 			}
 
+			table.freeze(output);
+
 			return output;
 		}
 
@@ -207,14 +210,17 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 	public AddDefinition<D extends Definition>(definition: D) {
 		this.definitions.push(definition);
 
-		return this as unknown as NetBuilder<R & { readonly [_ in InferDefinitionId<D>]: D }, O>;
+		return this as unknown as NetBuilder<
+			Reconstruct<R & { readonly [_ in InferDefinitionId<D>]: D }>,
+			O
+		>;
 	}
 
 	/** Adds a child definition namespace. */
 	public AddNamespace<S extends string, N extends DefinitionNamespace>(name: S, space: N) {
 		this.namespaces.push({ name, space });
 
-		return this as unknown as NetBuilder<R & { readonly [_ in S]: N }, O>;
+		return this as unknown as NetBuilder<Reconstruct<R & { readonly [_ in S]: N }>, O>;
 	}
 
 	public Configure(config: ((builder: ConfigurationBuilder) => object) | NetBuilderConfiguration) {
@@ -297,10 +303,12 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 		}
 
 		for (const { name, space } of namespaces) {
-			space[NamespaceId] = name;
-			space[NamespaceParent] = dict;
-			space[Configuration] = space[Configuration]
-				? { ...this.configuration, ...(space[Configuration] as NetBuilderConfiguration) }
+			const s = symbolDictionary(space);
+
+			s[NamespaceId] = name;
+			s[NamespaceParent] = dict;
+			s[Configuration] = s[Configuration]
+				? { ...this.configuration, ...(s[Configuration] as NetBuilderConfiguration) }
 				: this.configuration;
 
 			table.freeze(space);
@@ -308,7 +316,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 			dict.set(name, space);
 		}
 
-		const thisNamespace = dict as unknown as DefinitionNamespace;
+		const thisNamespace = symbolDictionary(dict);
 		thisNamespace[Configuration] = this.configuration;
 		thisNamespace[GlobalMiddleware] = this.middlewareList;
 		thisNamespace[Serializables] = this.serializableClasses;
@@ -326,9 +334,8 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 	/** Generates dispatchers for each side. */
 	public Build() {
 		const { cache } = this;
-		const dict = this._build();
-
-		return {
+		const definitions = this._build();
+		const remotes = {
 			/** Generated server dispatchers */
 			Server: setmetatable(
 				{},
@@ -340,7 +347,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 						}
 
 						return cache.Server.getOrInsertWith(
-							() => this.createDispatchers(Boundary.Server, dict) as never,
+							() => this.createDispatchers(Boundary.Server, definitions) as never,
 						)[key as keyof R];
 					},
 				},
@@ -356,12 +363,16 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 						}
 
 						return cache.Client.getOrInsertWith(
-							() => this.createDispatchers(Boundary.Client, dict) as never,
+							() => this.createDispatchers(Boundary.Client, definitions) as never,
 						)[key as keyof R];
 					},
 				},
 			) as NetBuilderClient<R>,
 		} as const;
+
+		table.freeze(remotes);
+
+		return remotes;
 	}
 }
 

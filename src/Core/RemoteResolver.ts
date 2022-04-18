@@ -16,6 +16,7 @@ import netBuilderWarn from "../Util/netBuilderWarn";
 import getRemoteInstanceKind from "../Util/getRemoteInstanceKind";
 import definitionInfo from "../Util/definitionInfo";
 import netBuilderError from "../Util/netBuilderError";
+import symbolDictionary from "../Util/symbolDictionary";
 
 interface TreeNode {
 	Name: string;
@@ -26,7 +27,7 @@ interface Entry {
 	Members: DefinitionMembers;
 	Manager: RemoteResolver<Callback>;
 	IsSender: boolean;
-	Tree: readonly TreeNode[];
+	Tree: ReadonlyArray<TreeNode>;
 }
 
 const ReplicatedStorage = game.GetService("ReplicatedStorage");
@@ -74,8 +75,9 @@ class RemoteResolver<F extends Callback> {
 		const { root } = this;
 
 		function visitNamespaces(tree: TreeNode[], namespace: DefinitionNamespace, first?: true) {
-			const name = namespace[NamespaceId] as string | undefined;
-			const parent = namespace[NamespaceParent] as DefinitionNamespace | undefined;
+			const symbols = symbolDictionary(namespace);
+			const name = symbols[NamespaceId] as string | undefined;
+			const parent = symbols[NamespaceParent] as DefinitionNamespace | undefined;
 
 			tree.unshift({
 				Name: name ?? root.Name,
@@ -115,7 +117,7 @@ class RemoteResolver<F extends Callback> {
 	// Server
 	public static For<F extends Callback>(definition: Definition, isSender: boolean) {
 		const def = definition as unknown as DefinitionMembers;
-		const config = def.Namespace[Configuration] as NetBuilderConfiguration;
+		const config = symbolDictionary(def.Namespace)[Configuration] as NetBuilderConfiguration;
 
 		this.root = this.unwrapRootInstance(config.RootInstance).unwrapOrElse(() =>
 			this.createDirectory(this.defaultRootName, ReplicatedStorage),
@@ -170,7 +172,8 @@ class RemoteResolver<F extends Callback> {
 	public static Request<F extends Callback>(definition: DefinitionMembers) {
 		const root = (
 			this.unwrapRootInstance(
-				(definition.Namespace[Configuration] as NetBuilderConfiguration).RootInstance,
+				(symbolDictionary(definition.Namespace)[Configuration] as NetBuilderConfiguration)
+					.RootInstance,
 			) as Option<{ Name: string; Parent?: Instance }>
 		).expect("An error occured while trying to unwrap the root directory.");
 

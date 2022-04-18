@@ -134,7 +134,6 @@ export interface DefinitionMembers {
 }
 
 export interface DefinitionNamespace {
-	[namespaceProp: symbol]: unknown;
 	[x: string]: Definition;
 }
 

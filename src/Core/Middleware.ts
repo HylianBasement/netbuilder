@@ -16,6 +16,7 @@ import GlobalMiddleware from "../Symbol/GlobalMiddleware";
 
 import definitionInfo from "../Util/definitionInfo";
 import netBuilderWarn from "../Util/netBuilderWarn";
+import symbolDictionary from "../Util/symbolDictionary";
 import { IS_SERVER } from "../Util/boundary";
 
 interface MiddlewareEntry {
@@ -190,10 +191,12 @@ namespace Middleware {
 	}
 
 	function getMiddlewares(definition: DefinitionMembers) {
-		const globalMiddlewares = definition.Namespace[GlobalMiddleware] as Array<NetBuilderMiddleware>;
+		const globalMiddlewares = symbolDictionary(definition.Namespace)[
+			GlobalMiddleware
+		] as Array<NetBuilderMiddleware>;
 
 		return Vec.fromPtr([...definition.Middlewares, ...globalMiddlewares])
-			.dedupBy(({ Id: i1 }, { Id: i2 }) => i1 === i2 && i1 !== "Unknown")
+			.dedupBy(({ Id: i1 }, { Id: i2 }) => i1 === i2)
 			.asPtr();
 	}
 

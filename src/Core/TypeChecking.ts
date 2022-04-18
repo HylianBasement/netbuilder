@@ -4,6 +4,7 @@ type TypeCheckingResult =
 	| LuaTuple<[failed: true, errMessage: string]>
 	| LuaTuple<[failed: false, errMessage: undefined]>;
 
+/** @internal */
 namespace TypeChecking {
 	export function Parameters(args: unknown[], checks: ReadonlyArray<Check<any>>) {
 		let errMessage!: string;
