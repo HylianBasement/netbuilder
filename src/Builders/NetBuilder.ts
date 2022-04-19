@@ -338,12 +338,15 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 		return this._build() as unknown as R;
 	}
 
-	/** Generates dispatchers for each side. */
+	/** Creates dispatchers for both client and server. */
 	public Build() {
 		const { cache } = this;
 		const definitions = this._build();
 		const remotes = {
-			/** Generated server dispatchers */
+			/**
+			 * Generated server definitions
+			 * @server
+			 */
 			Server: setmetatable(
 				{},
 				{
@@ -359,7 +362,10 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 					},
 				},
 			) as NetBuilderServer<R>,
-			/** Generated client dispatchers */
+			/**
+			 * Generated client definitions
+			 * @client
+			 */
 			Client: setmetatable(
 				{},
 				{
