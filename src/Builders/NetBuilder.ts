@@ -181,6 +181,13 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 		};
 	}
 
+	/** Utility function for creating type checkers. */
+	public static CreateTypeChecker<T>(
+		checker: (value: unknown) => boolean | LuaTuple<[boolean, string]>,
+	) {
+		return checker as (value: unknown) => value is T;
+	}
+
 	private createDispatchers(boundary: Boundary, dict: Map<string, Definition | DefinitionNamespace>) {
 		const Dispatcher = boundary === Boundary.Server ? ServerDispatcher : ClientDispatcher;
 

@@ -4,8 +4,6 @@ import { t } from "@rbxts/t";
 import Person from "./Class/Person";
 import Log from "./Util/Log";
 
-const personCheck = (value: unknown): value is Person => value instanceof Person;
-
 export = new NetBuilder()
 	.Configure((config) =>
 		config
@@ -22,9 +20,9 @@ export = new NetBuilder()
 			.UseSerialization([Person])
 			.AddDefinition(
 				new DefinitionBuilder("VerifyAge")
-					.UseMiddleware([RateLimiter({ MaxPerMinute: 3 })])
-					.SetArguments(personCheck)
+					.SetArguments(Person.Type)
 					.SetReturn(t.boolean)
+					.UseMiddleware([RateLimiter({ MaxPerMinute: 3 })])
 					.Build(),
 			)
 			.AsNamespace(),

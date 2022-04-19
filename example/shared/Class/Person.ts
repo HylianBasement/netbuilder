@@ -1,4 +1,4 @@
-import { Serializable } from "@rbxts/netbuilder";
+import { NetBuilder, Serializable } from "@rbxts/netbuilder";
 
 interface Props {
 	name: string;
@@ -8,12 +8,14 @@ interface Props {
 class Person implements Serializable<Props> {
 	public constructor(private name: string, private age: number) {}
 
+	public static Type = NetBuilder.CreateTypeChecker<Person>((v) => v instanceof Person);
+
 	public static deserialize({ name, age }: Props) {
 		return new Person(name, age);
 	}
 
 	private toString() {
-		return "Person";
+		return `Person<${this.name}>`;
 	}
 
 	public Serialize() {
