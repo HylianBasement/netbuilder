@@ -140,8 +140,8 @@ Current available fields for configuration are:
 new NetBuilder()
 	.Configure({
 		RootInstance: (rs) => rs.WaitForChild("MyRemotes"),
+		SupressWarnings: true,
 	})
-	.SupressWarnings()
 	.AddNamespace("Foo",
 		new NetBuilder()
 			.Configure({
@@ -314,9 +314,9 @@ After that, the job is complete and our remote is ready to send and receive requ
 
 ```js
 // Something.server.ts
-import Remotes from "shared/Remotes";
+import { Server } from "shared/Remotes";
 
-Server.CreateEvent(Remotes.Introduction).Connect((player, person) => {
+Server.Introduction.Connect((player, person) => {
 	person.Introduce();
 
 	if (person.IsUnderage()) {
@@ -326,7 +326,7 @@ Server.CreateEvent(Remotes.Introduction).Connect((player, person) => {
 	return Result.ok("Welp, there you go.");
 });
 
-// Remotes.ts
+// Definitions.ts
 import Person from "../Class/Person";
 import RustResult from "../Serializer/RustResult";
 
