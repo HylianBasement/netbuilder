@@ -1,7 +1,14 @@
-import { NetBuilderConfiguration } from "../definitions";
+import { NetBuilderConfiguration, NetBuilderLogger } from "../definitions";
 
 class ConfigurationBuilder<O extends keyof ConfigurationBuilder = never> {
 	private configuration: NetBuilderConfiguration = { SuppressWarnings: false };
+
+	/** Changes the logger to all of the namespace's definitions. */
+	public SetLogger(logger: NetBuilderLogger) {
+		this.configuration.Logger = logger;
+
+		return this as unknown as Omit<ConfigurationBuilder<O | "SetLogger">, O | "SetLogger">;
+	}
 
 	/** Sets the root instance of the remotes from the namespace. */
 	public SetRoot(root: Instance | ((replicatedStorage: ReplicatedStorage) => Instance)) {

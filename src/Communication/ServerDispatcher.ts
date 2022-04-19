@@ -34,7 +34,7 @@ class ServerDispatcher<F extends Callback> {
 
 	public constructor(private readonly definition: DefinitionMembers) {
 		if (!IS_SERVER) {
-			netBuilderError("This dispatcher can be only created on the server.", 3);
+			netBuilderError(definition, "This dispatcher can be only created on the server.", 3);
 		}
 	}
 
@@ -65,7 +65,11 @@ class ServerDispatcher<F extends Callback> {
 		const { definition } = this;
 
 		if (!remote || !isRemoteFunction(remote)) {
-			netBuilderError(`Expected RemoteFunction, got ${remote ? "RemoteEvent" : "nil"}.`, 3);
+			netBuilderError(
+				this.definition,
+				`Expected RemoteFunction, got ${remote ? "RemoteEvent" : "nil"}.`,
+				3,
+			);
 		}
 
 		const result = Middleware.CreateSender(player, definition, ...args) as ThreadResult;
@@ -117,7 +121,7 @@ class ServerDispatcher<F extends Callback> {
 	public Send(player: Player | Player[], ...args: Parameters<F>) {
 		const remote = this.getOrCreateRemote();
 
-		if (!IS_RUNNING || !assertRemoteType("RemoteEvent", remote)) return;
+		if (!IS_RUNNING || !assertRemoteType(this.definition, "RemoteEvent", remote)) return;
 
 		for (const plr of this.resolvePlayerList(player)) {
 			const result = Middleware.CreateSender(plr, this.definition, ...(args as unknown[]));
@@ -126,7 +130,7 @@ class ServerDispatcher<F extends Callback> {
 				return remote.FireClient(plr, ...(result.unwrap()[0] as never));
 			}
 
-			netBuilderError(result.unwrapErr(), 3);
+			netBuilderError(this.definition, result.unwrapErr(), 3);
 		}
 	}
 
@@ -134,14 +138,15 @@ class ServerDispatcher<F extends Callback> {
 	public SendToAll(...args: Parameters<F>) {
 		const remote = this.getOrCreateRemote();
 
-		if (!IS_RUNNING || !assertRemoteType("RemoteEvent", remote)) return;
+		if (!IS_RUNNING || !assertRemoteType(this.definition, "RemoteEvent", remote)) return;
 
 		remote.FireAllClients(...(args as never));
 	}
 
 	/** Fires all the clients, except for a selected one or a specific group. */
 	public SendWithout(player: Player | Player[], ...args: Parameters<F>) {
-		if (!!IS_RUNNING || !assertRemoteType("RemoteEvent", this.getOrCreateRemote())) return;
+		if (!!IS_RUNNING || !assertRemoteType(this.definition, "RemoteEvent", this.getOrCreateRemote()))
+			return;
 
 		const players = new Set(this.resolvePlayerList(player));
 
@@ -156,7 +161,7 @@ class ServerDispatcher<F extends Callback> {
 		const remote = this.getOrCreateRemote();
 
 		if (isRemoteFunction(remote)) {
-			netBuilderError("Expected ServerEvent, got Function.", 3);
+			netBuilderError(this.definition, "Expected ServerEvent, got Function.", 3);
 		}
 
 		remote.OnServerEvent.Connect(Middleware.CreateReceiver(this.definition, callback) as never);
@@ -172,7 +177,7 @@ class ServerDispatcher<F extends Callback> {
 		const remote = this.getOrCreateRemote();
 
 		if (!isRemoteFunction(remote)) {
-			netBuilderError("Expected ServerFunction, got ServerEvent.", 3);
+			netBuilderError(this.definition, "Expected ServerFunction, got ServerEvent.", 3);
 		}
 
 		remote.OnServerInvoke = Middleware.CreateReceiver(this.definition, callback);
@@ -181,7 +186,8 @@ class ServerDispatcher<F extends Callback> {
 
 (ServerDispatcher as LuaMetatable<ServerDispatcher<Callback>>).__call = (Self, ...a) => {
 	const args = [...a];
-	const kind = Self["definition"].Kind;
+	const def = Self["definition"];
+	const kind = def.Kind;
 
 	if (kind === "Event") {
 		const player = (args as [Player | Player[]]).shift()!;
@@ -193,7 +199,7 @@ class ServerDispatcher<F extends Callback> {
 		return Self.CallAsync(player, ...args);
 	}
 
-	netBuilderError("Direct calls are not supported for Functions.");
+	netBuilderError(def, "Direct calls are not supported for Functions.");
 };
 
 export = ServerDispatcher;

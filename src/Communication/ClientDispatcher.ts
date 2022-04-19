@@ -32,7 +32,7 @@ class ClientDispatcher<F extends Callback> {
 
 	public constructor(private readonly definition: DefinitionMembers) {
 		if (!IS_CLIENT) {
-			netBuilderError("This dispatcher can be only created on the client.", 3);
+			netBuilderError(this.definition, "This dispatcher can be only created on the client.", 3);
 		}
 	}
 
@@ -60,7 +60,7 @@ class ClientDispatcher<F extends Callback> {
 			return result.Data;
 		}
 
-		netBuilderError(result.Message, 3);
+		netBuilderError(this.definition, result.Message, 3);
 	}
 
 	/** Calls the server and returns a promise. */
@@ -97,7 +97,11 @@ class ClientDispatcher<F extends Callback> {
 		const { definition } = this;
 
 		if (!remote || !isRemoteFunction(remote)) {
-			netBuilderError(`Expected RemoteFunction, got ${remote ? "RemoteEvent" : "nil"}.`, 3);
+			netBuilderError(
+				this.definition,
+				`Expected RemoteFunction, got ${remote ? "RemoteEvent" : "nil"}.`,
+				3,
+			);
 		}
 
 		const result = Middleware.CreateSender(
@@ -132,7 +136,7 @@ class ClientDispatcher<F extends Callback> {
 	public Send(...args: Parameters<F>) {
 		const remote = this.tryFindRemote();
 
-		if (!assertRemoteType("RemoteEvent", remote)) return;
+		if (!assertRemoteType(this.definition, "RemoteEvent", remote)) return;
 
 		const result = Middleware.CreateSender(player, this.definition, ...(args as unknown[]));
 
@@ -146,7 +150,7 @@ class ClientDispatcher<F extends Callback> {
 	/** Connects a listener callback that is called whenever new data is received from the server. */
 	public Connect(callback: (...args: Parameters<F>) => void | Promise<void>) {
 		if (this.definition.Kind === "Function") {
-			netBuilderError("Client functions are not supported!", 3);
+			netBuilderError(this.definition, "Client functions are not supported!", 3);
 		}
 
 		const remote = this.tryFindRemote();
@@ -154,7 +158,7 @@ class ClientDispatcher<F extends Callback> {
 		if (!remote) return;
 
 		if (isRemoteFunction(remote)) {
-			netBuilderError("Expected ClientEvent, got ClientFunction.", 3);
+			netBuilderError(this.definition, "Expected ClientEvent, got ClientFunction.", 3);
 		}
 
 		remote.OnClientEvent.Connect(Middleware.CreateReceiver(this.definition, callback) as F);
@@ -172,9 +176,9 @@ class ClientDispatcher<F extends Callback> {
 		if (!remote) return;
 
 		if (this.definition.Kind === "Function") {
-			netBuilderError("Client functions are not supported!", 3);
+			netBuilderError(this.definition, "Client functions are not supported!", 3);
 		} else if (!isRemoteFunction(remote)) {
-			netBuilderError("Expected ClientAsyncFunction, got ClientEvent.", 3);
+			netBuilderError(this.definition, "Expected ClientAsyncFunction, got ClientEvent.", 3);
 		}
 
 		remote.OnClientInvoke = Middleware.CreateReceiver(this.definition, callback) as F;
