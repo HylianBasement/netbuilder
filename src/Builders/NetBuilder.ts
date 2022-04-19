@@ -289,7 +289,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 
 		for (const { GlobalEnabled, Id } of this.middlewareList) {
 			if (!GlobalEnabled) {
-				netBuilderError(`The middleware "${Id}" is not globally enabled.`, 3);
+				error(`[netbuilder] The middleware "${Id}" is not globally enabled.`, 3);
 			}
 		}
 
@@ -343,7 +343,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 					__tostring: () => "NetBuilder.ServerDefinitions",
 					__index: (_, key) => {
 						if (!IS_SERVER) {
-							netBuilderError("Cannot access server definitions from a client.");
+							error("[netbuilder] Cannot access server definitions from a client.");
 						}
 
 						return cache.Server.getOrInsertWith(
@@ -359,7 +359,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 					__tostring: () => "NetBuilder.ClientDefinitions",
 					__index: (_, key) => {
 						if (!IS_CLIENT) {
-							netBuilderError("Cannot access client definitions from the server.");
+							error("[netbuilder] Cannot access client definitions from the server.");
 						}
 
 						return cache.Client.getOrInsertWith(

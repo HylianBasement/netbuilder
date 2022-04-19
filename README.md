@@ -12,12 +12,14 @@ NetBuilder is a Roblox networking library, aiming to simplify network management
 
 ## Features
 - Builder API for creating and configuring definitions/middlewares.
-- Definitions inside namespaces, for better organization.
+- Namespaces for definitions, for better organization.
+- Automatic sort for generated remote trees. If a definition is not being used, it won't be generated.
 - Middlewares to have the ability to put your own custom behaviours to remotes. Middlewares have contextual, global and IO mapping support. There are [built-in middlewares](https://github.com/Rimuy/netbuilder/tree/main/src/Middleware) available for use.
-- Specific APIs for when choosing to connect events/functions on the client or server.
+- Direct references to definitions for both client and server.
+- Supports promise return values (asynchronous functions) for both events and functions.
 - AsyncFunctions with timeouts, using `CallAsync`.
 - (De)serialization for both parameters and return values.
-- Supports promise return values (asynchronous functions) for both events and functions.
+- Ability to change the logger.
 
 ## Goals
 - An authentic, simple and intuitive API.
@@ -132,6 +134,7 @@ Namespaces are configurable! With the `Configure` method, we're able to change h
 Current available fields for configuration are:
 - `RootInstance` - Changes the location of the remote instances main directory.
 - `SupressWarnings` - Disables all the warnings emitted from the library.
+- `Logger` - Changes the logger to all of the namespace's definitions.
 
 ```js
 new NetBuilder()

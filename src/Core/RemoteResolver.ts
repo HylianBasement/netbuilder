@@ -42,7 +42,7 @@ class RemoteResolver<F extends Callback> {
 
 	private constructor(private readonly remote: Remote<F>) {}
 
-	private static generate(parent: Instance, tree: readonly TreeNode[]) {
+	private static generate(parent: Instance, tree: ReadonlyArray<TreeNode>) {
 		const wasFound = Iterator.fromItems(...tree)
 			.findMap<Remote<Callback>>((node) =>
 				node.Remote.isSome() && parent.Name === node.Name ? node.Remote : Option.none(),
@@ -131,6 +131,7 @@ class RemoteResolver<F extends Callback> {
 			.andWith(({ Members, Manager, Tree }) => {
 				if ((Members as unknown as Definition) === definition) {
 					netBuilderError(
+						definition,
 						`Detected a duplicated server dispatcher of ${[
 							...Tree.map(({ Name }) => Name),
 							Id,

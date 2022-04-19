@@ -92,9 +92,15 @@ export interface NetBuilderAsyncReturn<T> extends Promise<T> {
 	): Promise<T | TResult>;
 }
 
+export interface NetBuilderLogger {
+	Error?: (definition: LoggingDefinition, stderr: unknown) => void;
+	Warn?: (definition: LoggingDefinition, ...params: unknown[]) => void;
+}
+
 export interface NetBuilderConfiguration {
 	RootInstance?: Instance | ((replicatedStorage: ReplicatedStorage) => Instance);
 	SuppressWarnings?: boolean;
+	Logger?: NetBuilderLogger;
 }
 
 export type NetBuilderMiddleware<F extends Callback = Callback> = ObjectDispatcher<

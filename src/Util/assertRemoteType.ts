@@ -1,16 +1,19 @@
+import { DefinitionMembers } from "../definitions";
+
 import isRemoteFunction from "./isRemoteFunction";
 import netBuilderError from "./netBuilderError";
 
 export = <T extends "RemoteEvent" | "RemoteFunction">(
+	definition: DefinitionMembers,
 	remoteClass: T,
 	remote?: RemoteFunction | RemoteEvent,
 ): remote is CreatableInstances[T] => {
 	if (!remote) {
-		netBuilderError("Remote does not exist.");
+		netBuilderError(definition, "Remote does not exist.");
 	} else if (remoteClass === "RemoteEvent" && isRemoteFunction(remote)) {
-		netBuilderError("Expected RemoteEvent, got RemoteFunction.");
+		netBuilderError(definition, "Expected RemoteEvent, got RemoteFunction.");
 	} else if (remoteClass === "RemoteFunction" && !isRemoteFunction(remote)) {
-		netBuilderError("Expected RemoteFunction, got RemoteEvent.");
+		netBuilderError(definition, "Expected RemoteFunction, got RemoteEvent.");
 	}
 
 	return true;
