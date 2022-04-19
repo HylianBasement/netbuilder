@@ -19,10 +19,10 @@ export = new NetBuilder()
 	.AddNamespace(
 		"People",
 		new NetBuilder()
-			.WithSerialization([Person])
+			.UseSerialization([Person])
 			.AddDefinition(
 				new DefinitionBuilder("VerifyAge")
-					.WithMiddleware([RateLimiter({ MaxPerMinute: 3 })])
+					.UseMiddleware([RateLimiter({ MaxPerMinute: 3 })])
 					.SetArguments(personCheck)
 					.SetReturn(t.boolean)
 					.Build(),

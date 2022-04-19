@@ -250,17 +250,17 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 	}
 
 	/** Sets a list of middlewares valid for every descendant definition. */
-	public WithGlobalMiddleware(middleware: NetBuilderMiddleware[]) {
+	public UseGlobalMiddleware(middleware: NetBuilderMiddleware[]) {
 		this.middlewareList = middleware;
 
 		return this as unknown as Omit<
-			NetBuilder<R, O | "WithGlobalMiddleware">,
-			O | "WithGlobalMiddleware"
+			NetBuilder<R, O | "UseGlobalMiddleware">,
+			O | "UseGlobalMiddleware"
 		>;
 	}
 
 	/** Adds a list serializers to the registry. Whenever a request is made, parameters and return values are (de)serialized if they match any of the provided serializable classes. */
-	public WithSerialization(classes: SerializableObject[]) {
+	public UseSerialization(classes: SerializableObject[]) {
 		this.serializableClasses = classes.filter(
 			(v) => !Serialization.IsSerializer(v),
 		) as Array<SerializableClass>;
@@ -280,7 +280,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 			this.serializationMap.SerializerClasses.set(obj.Class, { Serializer: obj, Id: i });
 		}
 
-		return this as unknown as Omit<NetBuilder<R, O | "WithSerialization">, O | "WithSerialization">;
+		return this as unknown as Omit<NetBuilder<R, O | "UseSerialization">, O | "UseSerialization">;
 	}
 
 	private _build() {

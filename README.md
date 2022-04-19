@@ -158,7 +158,7 @@ new NetBuilder()
 Middlewares are a way to add custom behaviour to our remotes. They are fully customizable, which means that we are able to change what is sent/received and to drop a request if necessary.
 
 ### Using middlewares
-As simple as just chaining `WithMiddleware`. It takes a list of middlewares and adds them to the definition's registry.
+As simple as just chaining `UseMiddleware`. It takes a list of middlewares and adds them to the definition's registry.
 The middlewares used in the below example are `RateLimiter`, which limits how many request can be made per minute, and `Tracer`, which just executes its callback whenever a request is made, providing some information. Both are globally-enabled and can be namespace-wide!
 
 ```js
@@ -166,7 +166,7 @@ new NetBuilder()
 	.AddDefinition(
 		new DefinitionBuilder("Print")
 			.SetArguments(t.string)
-			.WithMiddleware([
+			.UseMiddleware([
 				RateLimiter({ MaxPerMinute: 10 }),
 				Tracer((executor) => print(`Hello, ${executor.Name}!`)),
 			])
@@ -175,11 +175,11 @@ new NetBuilder()
 	.Build();
 ```
 
-Now this is what it looks when we're using them globally. `WithGlobalMiddleware` registers a list of middlewares to the namespace, so any request made will first go through its definition's middlewares, and then the global ones before executing its callback.
+Now this is what it looks when we're using them globally. `UseGlobalMiddleware` registers a list of middlewares to the namespace, so any request made will first go through its definition's middlewares, and then the global ones before executing its callback.
 
 ```js
 new NetBuilder()
-	.WithGlobalMiddleware([
+	.UseGlobalMiddleware([
 		RateLimiter({ MaxPerMinute: 15 }),
 		Tracer((executor, definition, ...args) =>
 			print(
@@ -191,7 +191,7 @@ new NetBuilder()
 	.AddDefinition(
 		new DefinitionBuilder("Print")
 			.SetArguments(t.string)
-			.WithMiddleware([RateLimiter({ MaxPerMinute: 5 })])
+			.UseMiddleware([RateLimiter({ MaxPerMinute: 5 })])
 			.Build()
 	)
 	.AddDefinition(
@@ -239,7 +239,7 @@ export = LegacySystem;
 
 // Remotes.ts
 export = new DefinitionBuilder("Hello")
-	.WithMiddleware([LegacySystem("This is a very old system, period.")])
+	.UseMiddleware([LegacySystem("This is a very old system, period.")])
 	.Build();
 ```
 
@@ -308,7 +308,7 @@ NetBuilder.CreateSerializer<SResult>(Result, {
 ```
 
 ### Registering serializable classes & serializers
-We have our classes ready, but how do we register them? All we need to do is to chain the `WithSerialization` method from the namespace's builder. It takes a list of serializable classes and serializers.
+We have our classes ready, but how do we register them? All we need to do is to chain the `UseSerialization` method from the namespace's builder. It takes a list of serializable classes and serializers.
 
 After that, the job is complete and our remote is ready to send and receive requests without having to worry about calling other functions to handle our classes.
 
@@ -331,7 +331,7 @@ import Person from "../Class/Person";
 import RustResult from "../Serializer/RustResult";
 
 export = new NetBuilder()
-	.WithSerialization([Person, RustResult])
+	.UseSerialization([Person, RustResult])
 	.AddDefinition(
 		new DefinitionBuilder("Introduction")
 			.SetArguments(t.Person)

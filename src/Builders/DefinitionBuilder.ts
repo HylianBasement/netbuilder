@@ -81,12 +81,12 @@ class DefinitionBuilder<
 	}
 
 	/** Applies all the given middleware functions to the definition. */
-	public WithMiddleware(middleware: NetBuilderMiddleware<D>[]) {
+	public UseMiddleware(middleware: NetBuilderMiddleware<D>[]) {
 		this.middlewareList = middleware;
 
 		return this as unknown as Omit<
-			DefinitionBuilder<I, D, K, O | "WithMiddleware">,
-			O | "WithMiddleware"
+			DefinitionBuilder<I, D, K, O | "UseMiddleware">,
+			O | "UseMiddleware"
 		>;
 	}
 
