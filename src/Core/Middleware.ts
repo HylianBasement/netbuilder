@@ -25,6 +25,7 @@ interface MiddlewareEntry {
 	Result: ThreadResult;
 }
 
+const OK = {};
 const Players = game.GetService("Players");
 
 /** @internal */
@@ -49,90 +50,99 @@ namespace Middleware {
 			if (middlewares.size() > 0) {
 				const state = resolveMiddlewares(player, definition, "Recv", args);
 
-				if (state.Result.isErr()) {
-					const message = state.Result.unwrapErr();
-
+				return state.Result.mapErr((message) => {
 					warnForEvents(definition, message);
 
 					return {
 						Type: "Err",
 						Message: message,
 					};
-				}
+				})
+					.andWith(() => {
+						const newArgs = (state.CurrentParameters as defined[]).map((v) =>
+							Serialization.Deserialize(definition.Namespace, v),
+						);
+						const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
 
-				const newArgs = (state.CurrentParameters as defined[]).map((v) =>
-					Serialization.Deserialize(definition.Namespace, v),
-				);
+						if (IS_SERVER && failed) {
+							warnForEvents(definition, message);
 
-				const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
+							return Result.err({
+								Type: "Err",
+								Message: message,
+							});
+						}
 
-				if (IS_SERVER && failed) {
-					warnForEvents(definition, message);
+						return Result.ok(executeFn(...newArgs));
+					})
+					.andWith((returnValue) => {
+						state.ReturnCallbacks.unshift((r) =>
+							Serialization.Serialize(definition.Namespace, r as never),
+						);
 
-					return {
-						Type: "Err",
-						Message: message,
-					};
-				}
+						if (definition.Kind !== "Event") {
+							const [failed, message] = TypeChecking.ReturnValue(
+								returnValue,
+								returnValueCheck,
+							);
 
-				state.ReturnCallbacks.unshift((r) =>
-					Serialization.Serialize(definition.Namespace, r as never),
-				);
+							if (IS_SERVER && failed) {
+								return Result.err({
+									Type: "Err",
+									Message: message,
+								});
+							}
+						}
 
-				const returnValue = executeFn(...newArgs);
+						return Result.ok({
+							Type: "Ok",
+							Data: state.ReturnCallbacks.reduce((acc, fn) => fn(acc), returnValue),
+						});
+					})
+					.asPtr() as NetBuilderResult<unknown>;
+			}
 
-				if (definition.Kind !== "Event") {
-					const [failed, message] = TypeChecking.ReturnValue(returnValue, returnValueCheck);
+			return Result.ok(
+				(args as defined[]).map((v) => Serialization.Deserialize(definition.Namespace, v)),
+			)
+				.andWith((newArgs) => {
+					const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
 
 					if (IS_SERVER && failed) {
-						return {
+						return Result.err({
 							Type: "Err",
 							Message: message,
-						};
+						});
 					}
-				}
 
-				return {
-					Type: "Ok",
-					Data: state.ReturnCallbacks.reduce((acc, fn) => fn(acc), returnValue),
-				};
-			}
+					return Result.ok(executeFn(...newArgs));
+				})
+				.andWith((returnValue) => {
+					if (definition.Kind !== "Event") {
+						const [failed, message] = TypeChecking.ReturnValue(
+							returnValue,
+							returnValueCheck,
+						);
 
-			const newArgs = (args as defined[]).map((v) =>
-				Serialization.Deserialize(definition.Namespace, v),
-			);
+						if (IS_SERVER && failed) {
+							warnForEvents(definition, message);
 
-			const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
+							return Result.err({
+								Type: "Err",
+								Message: message,
+							});
+						}
+					}
 
-			if (IS_SERVER && failed) {
-				return {
-					Type: "Err",
-					Message: message,
-				};
-			}
-
-			const returnValue = executeFn(...newArgs);
-
-			if (definition.Kind !== "Event") {
-				const [failed, message] = TypeChecking.ReturnValue(returnValue, returnValueCheck);
-
-				if (IS_SERVER && failed) {
-					warnForEvents(definition, message);
-
-					return {
-						Type: "Err",
-						Message: message,
-					};
-				}
-			}
-
-			return {
-				Type: "Ok",
-				Data: Serialization.Serialize(
-					definition.Namespace,
-					Serialization.Deserialize(definition.Namespace, returnValue),
-				),
-			};
+					return Result.ok({
+						Type: "Ok",
+						Data: Serialization.Serialize(
+							definition.Namespace,
+							Serialization.Deserialize(definition.Namespace, returnValue),
+						),
+					});
+				})
+				.asPtr() as NetBuilderResult<unknown>;
 		};
 	}
 
@@ -150,24 +160,31 @@ namespace Middleware {
 				Serialization.Serialize(definition.Namespace, v),
 			);
 
-			const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
+			return Result.ok(OK)
+				.andWith(() => {
+					const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
 
-			if (IS_SERVER && failed) {
-				warnForEvents(definition, message);
+					if (IS_SERVER && failed) {
+						warnForEvents(definition, message);
 
-				return Result.err(message);
-			}
+						return Result.err(message);
+					}
 
-			state.ReturnCallbacks.unshift((r) =>
-				Serialization.Deserialize(definition.Namespace, r as never),
-			);
+					return Result.ok(OK);
+				})
+				.andWith(() => {
+					state.ReturnCallbacks.unshift((r) =>
+						Serialization.Deserialize(definition.Namespace, r as never),
+					);
 
-			return state.Result.and(
-				Result.ok([
-					newArgs,
-					(r: unknown) => state.ReturnCallbacks.reduce((acc, fn) => fn(acc), r),
-				]),
-			);
+					return state.Result;
+				})
+				.and(
+					Result.ok([
+						newArgs,
+						(r: unknown) => state.ReturnCallbacks.reduce((acc, fn) => fn(acc), r),
+					]),
+				) as Result<[defined[], (r: unknown) => unknown], string>;
 		}
 
 		const newArgs = (args as defined[]).map((v) => Serialization.Serialize(definition.Namespace, v));
