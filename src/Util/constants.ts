@@ -13,4 +13,5 @@ export const enum Timeout {
 	AsyncFunctionDefault = 30,
 	Middleware = 45,
 	Remote = 60,
+	RateLimiter = 60,
 }

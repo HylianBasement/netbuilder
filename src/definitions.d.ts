@@ -141,18 +141,6 @@ export interface DefinitionNamespace {
 	[x: string]: Definition;
 }
 
-export interface RateLimiterOptions {
-	readonly MaxPerMinute: number;
-	readonly Listener?: (error: RateLimiterError) => void;
-}
-
-export interface RateLimiterError {
-	readonly Executor: Player;
-	readonly Message: string;
-	readonly Requests: number;
-	readonly Definition: LoggingDefinition;
-}
-
 export interface BuilderMembers {
 	id: string;
 	kind: DefinitionKind;

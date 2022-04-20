@@ -22,7 +22,7 @@ export = new NetBuilder()
 				new DefinitionBuilder("VerifyAge")
 					.SetArguments(Person.Type)
 					.SetReturn(t.boolean)
-					.UseMiddleware([RateLimiter({ MaxPerMinute: 3 })])
+					.UseMiddleware([RateLimiter({ Max: 3 })])
 					.Build(),
 			)
 			.AsNamespace(),
