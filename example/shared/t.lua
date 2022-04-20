@@ -25,4 +25,11 @@ end
 **--]]
 t.boolean = t.typeof("boolean")
 
+--[[**
+	ensures Lua primitive string type
+	@param value The value to check against
+	@returns True iff the condition is satisfied, false otherwise
+**--]]
+t.string = t.typeof("string")
+
 return { t = t }
