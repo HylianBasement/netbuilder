@@ -8,7 +8,10 @@ interface Props {
 class Person implements Serializable<Props> {
 	public constructor(private name: string, private age: number) {}
 
-	public static Type = NetBuilder.CreateTypeChecker<Person>((v) => v instanceof Person);
+	public static Type = NetBuilder.CreateTypeChecker<Person>(
+		(v) =>
+			[v instanceof Person, `Expected Person, got ${typeOf(v)}.`] as LuaTuple<[boolean, string]>,
+	);
 
 	public static deserialize({ name, age }: Props) {
 		return new Person(name, age);
