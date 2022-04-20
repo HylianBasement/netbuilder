@@ -34,9 +34,8 @@ import Serializables from "../Symbol/Serializables";
 import Serializers from "../Symbol/Serializers";
 import SerializationMap from "../Symbol/SerializationMap";
 
-import netBuilderError from "../Util/netBuilderError";
 import symbolDictionary from "../Util/symbolDictionary";
-import { IS_CLIENT, IS_SERVER } from "../Util/boundary";
+import { IS_CLIENT, IS_SERVER } from "../Util/constants";
 
 const enum Boundary {
 	Server,

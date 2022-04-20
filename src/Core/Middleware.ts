@@ -17,7 +17,7 @@ import GlobalMiddleware from "../Symbol/GlobalMiddleware";
 import definitionInfo from "../Util/definitionInfo";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import symbolDictionary from "../Util/symbolDictionary";
-import { IS_SERVER } from "../Util/boundary";
+import { __, IS_SERVER } from "../Util/constants";
 
 interface FunctionState {
 	CurrentParameters: ReadonlyArray<unknown>;
@@ -31,7 +31,6 @@ interface DefinitionEntry {
 	Arguments: Array<unknown>;
 }
 
-const __ = {};
 const Players = game.GetService("Players");
 
 /** @internal */

@@ -1,8 +1,8 @@
 import { Iterator, Option, Result } from "@rbxts/rust-classes";
 
-import { Check, DefinitionNamespace } from "../definitions";
+import { Check } from "../definitions";
 
-import { IS_SERVER } from "../Util/boundary";
+import { __, IS_SERVER } from "../Util/constants";
 
 interface Validation {
 	Message: string;
@@ -10,8 +10,6 @@ interface Validation {
 }
 
 type TypeCheckingResult = Result<defined, string>;
-
-const __ = {};
 
 /** @internal */
 namespace TypeChecking {
