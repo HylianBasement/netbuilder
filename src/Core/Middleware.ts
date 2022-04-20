@@ -6,7 +6,7 @@ import {
 	DefinitionMembers,
 	ThreadResult,
 	NetBuilderResult,
-	Optional,
+	ObjectDispatcher,
 } from "../definitions";
 
 import Serialization from "./Serialization";
@@ -19,13 +19,19 @@ import netBuilderWarn from "../Util/netBuilderWarn";
 import symbolDictionary from "../Util/symbolDictionary";
 import { IS_SERVER } from "../Util/boundary";
 
-interface MiddlewareEntry {
+interface FunctionState {
 	CurrentParameters: ReadonlyArray<unknown>;
 	ReturnCallbacks: Array<(value: unknown) => unknown>;
 	Result: ThreadResult;
 }
 
-const OK = {};
+interface DefinitionEntry {
+	Definition: DefinitionMembers;
+	Kind: keyof ObjectDispatcher<never, never>;
+	Arguments: Array<unknown>;
+}
+
+const __ = {};
 const Players = game.GetService("Players");
 
 /** @internal */
@@ -40,106 +46,60 @@ namespace Middleware {
 	): (...args: unknown[]) => NetBuilderResult<unknown> {
 		return (...args: unknown[]) => {
 			const player = IS_SERVER ? (args as [Player]).shift()! : Players.LocalPlayer;
-			const middlewares = getMiddlewares(definition);
+			const state = resolveMiddlewares(player, {
+				Definition: definition,
+				Kind: "Recv",
+				Arguments: args,
+			});
+
+			const [parameterChecks, returnValueCheck] = definition.Checks;
 
 			const executeFn = (...a: unknown[]) =>
 				awaitPromiseDeep(IS_SERVER ? callback(player, ...a) : callback(...a));
 
-			const [parameterChecks, returnValueCheck] = definition.Checks;
+			return state.Result.mapErr((message) => {
+				warnForEvents(definition, message);
 
-			if (middlewares.size() > 0) {
-				const state = resolveMiddlewares(player, definition, "Recv", args);
+				return {
+					Type: "Err",
+					Message: message,
+				};
+			})
+				.andWith(() => {
+					const newArgs = (state.CurrentParameters as defined[]).map((v) =>
+						Serialization.Deserialize(definition.Namespace, v),
+					);
 
-				return state.Result.mapErr((message) => {
-					warnForEvents(definition, message);
-
-					return {
-						Type: "Err",
-						Message: message,
-					};
-				})
-					.andWith(() => {
-						const newArgs = (state.CurrentParameters as defined[]).map((v) =>
-							Serialization.Deserialize(definition.Namespace, v),
-						);
-						const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
-
-						if (IS_SERVER && failed) {
+					return TypeChecking.Parameters(true, newArgs, parameterChecks)
+						.mapErr((message) => {
 							warnForEvents(definition, message);
 
-							return Result.err({
+							return {
 								Type: "Err",
 								Message: message,
-							});
-						}
-
-						return Result.ok(executeFn(...newArgs));
-					})
-					.andWith((returnValue) => {
-						state.ReturnCallbacks.unshift((r) =>
-							Serialization.Serialize(definition.Namespace, r as never),
-						);
-
-						if (definition.Kind !== "Event") {
-							const [failed, message] = TypeChecking.ReturnValue(
-								returnValue,
-								returnValueCheck,
-							);
-
-							if (IS_SERVER && failed) {
-								return Result.err({
-									Type: "Err",
-									Message: message,
-								});
-							}
-						}
-
-						return Result.ok({
-							Type: "Ok",
-							Data: state.ReturnCallbacks.reduce((acc, fn) => fn(acc), returnValue),
-						});
-					})
-					.asPtr() as NetBuilderResult<unknown>;
-			}
-
-			return Result.ok(
-				(args as defined[]).map((v) => Serialization.Deserialize(definition.Namespace, v)),
-			)
-				.andWith((newArgs) => {
-					const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
-
-					if (IS_SERVER && failed) {
-						return Result.err({
-							Type: "Err",
-							Message: message,
-						});
-					}
-
-					return Result.ok(executeFn(...newArgs));
+							};
+						})
+						.andWith(() => Result.ok(executeFn(...newArgs)));
 				})
 				.andWith((returnValue) => {
+					state.ReturnCallbacks.unshift((r) =>
+						Serialization.Serialize(definition.Namespace, r as never),
+					);
+
 					if (definition.Kind !== "Event") {
-						const [failed, message] = TypeChecking.ReturnValue(
-							returnValue,
-							returnValueCheck,
-						);
+						const result = TypeChecking.ReturnValue(returnValue, returnValueCheck);
 
-						if (IS_SERVER && failed) {
-							warnForEvents(definition, message);
-
-							return Result.err({
+						if (result.isErr()) {
+							return result.mapErr((message) => ({
 								Type: "Err",
 								Message: message,
-							});
+							}));
 						}
 					}
 
 					return Result.ok({
 						Type: "Ok",
-						Data: Serialization.Serialize(
-							definition.Namespace,
-							Serialization.Deserialize(definition.Namespace, returnValue),
-						),
+						Data: state.ReturnCallbacks.reduce((acc, fn) => fn(acc), returnValue),
 					});
 				})
 				.asPtr() as NetBuilderResult<unknown>;
@@ -151,60 +111,52 @@ namespace Middleware {
 		definition: DefinitionMembers,
 		...args: unknown[]
 	): Result<[unknown[], (r: unknown) => unknown], string> {
-		const middlewares = getMiddlewares(definition);
+		const state = resolveMiddlewares(player, {
+			Definition: definition,
+			Kind: "Send",
+			Arguments: args,
+		});
+
+		const newArgs = (state.CurrentParameters as defined[]).map((v) =>
+			Serialization.Serialize(definition.Namespace, v),
+		);
+
 		const [parameterChecks] = definition.Checks;
 
-		if (middlewares.size() > 0) {
-			const state = resolveMiddlewares(player, definition, "Send", args);
-			const newArgs = (state.CurrentParameters as defined[]).map((v) =>
-				Serialization.Serialize(definition.Namespace, v),
-			);
-
-			return Result.ok(OK)
-				.andWith(() => {
-					const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
-
-					if (IS_SERVER && failed) {
+		return Result.ok(__)
+			.andWith(() => {
+				return TypeChecking.Parameters(false, newArgs, parameterChecks)
+					.mapErr((message) => {
 						warnForEvents(definition, message);
 
-						return Result.err(message);
-					}
+						return message;
+					})
+					.and(Result.ok(__));
+			})
+			.andWith(() => {
+				state.ReturnCallbacks.unshift((r) =>
+					Serialization.Deserialize(definition.Namespace, r as never),
+				);
 
-					return Result.ok(OK);
-				})
-				.andWith(() => {
-					state.ReturnCallbacks.unshift((r) =>
-						Serialization.Deserialize(definition.Namespace, r as never),
-					);
-
-					return state.Result;
-				})
-				.and(
-					Result.ok([
-						newArgs,
-						(r: unknown) => state.ReturnCallbacks.reduce((acc, fn) => fn(acc), r),
-					]),
-				) as Result<[defined[], (r: unknown) => unknown], string>;
-		}
-
-		const newArgs = (args as defined[]).map((v) => Serialization.Serialize(definition.Namespace, v));
-		const [failed, message] = TypeChecking.Parameters(newArgs, parameterChecks);
-
-		if (IS_SERVER && failed) {
-			warnForEvents(definition, message);
-
-			return Result.err(message);
-		}
-
-		return Result.ok([
-			newArgs,
-			(r: unknown) => Serialization.Deserialize(definition.Namespace, r as never),
-		]);
+				return state.Result;
+			})
+			.and(
+				Result.ok([
+					newArgs,
+					(r: unknown) => state.ReturnCallbacks.reduce((acc, fn) => fn(acc), r),
+				]),
+			) as Result<[defined[], (r: unknown) => unknown], string>;
 	}
 
 	function awaitPromiseDeep<T>(promise: T | Promise<T>): T {
 		const value = Promise.is(promise) ? promise.expect() : promise;
 		return Promise.is(value) ? awaitPromiseDeep<T>(value as T) : value;
+	}
+
+	function warnForEvents(definition: DefinitionMembers, message: string) {
+		if (definition.Kind === "Event") {
+			netBuilderWarn(definition, message);
+		}
 	}
 
 	function getMiddlewares(definition: DefinitionMembers) {
@@ -214,53 +166,41 @@ namespace Middleware {
 
 		return Vec.fromPtr([...definition.Middlewares, ...globalMiddlewares])
 			.dedupBy(({ Id: i1 }, { Id: i2 }) => i1 === i2)
+			.iter();
+	}
+
+	function resolveMiddlewares(player: Player, { Definition, Kind, Arguments }: DefinitionEntry) {
+		return getMiddlewares(Definition)
+			.tryFold(
+				identity<FunctionState>({
+					CurrentParameters: Arguments,
+					ReturnCallbacks: [],
+					Result: Result.ok([Arguments, (r: unknown) => r]),
+				}),
+				(state, middleware) => {
+					const result = createChannel(Definition, middleware[Kind])
+						.then(([fn, e]) => {
+							task.spawn(fn, player, ...state.CurrentParameters);
+
+							return e;
+						})
+						.expect();
+
+					return result
+						.andWith<FunctionState>(([newParams, returnFn]) =>
+							Result.ok({
+								CurrentParameters: newParams,
+								ReturnCallbacks: [...state.ReturnCallbacks, returnFn],
+								Result: result,
+							}),
+						)
+						.mapErr<FunctionState>(() => ({
+							...state,
+							Result: result,
+						}));
+				},
+			)
 			.asPtr();
-	}
-
-	function warnForEvents(definition: DefinitionMembers, message: string) {
-		if (definition.Kind === "Event") {
-			netBuilderWarn(definition, message);
-		}
-	}
-
-	function resolveMiddlewares(
-		player: Player,
-		definition: DefinitionMembers,
-		kind: "Send" | "Recv",
-		args: unknown[],
-	) {
-		const middlewares = getMiddlewares(definition);
-
-		const state: Optional<MiddlewareEntry, "Result"> = {
-			CurrentParameters: args,
-			ReturnCallbacks: [],
-		};
-
-		for (const m of middlewares) {
-			createChannel(definition, m[kind])
-				.then(([fn, e]) => {
-					task.spawn(fn, player, ...state.CurrentParameters);
-
-					return e;
-				})
-				.then((result) => {
-					if (!state.Result || state.Result.isOk()) {
-						state.Result = result.andWith(([newParams, returnFn]) => {
-							state.CurrentParameters = newParams ?? [];
-							state.ReturnCallbacks.push(returnFn);
-
-							return result;
-						});
-					}
-				})
-				.expect();
-
-			if (state.Result?.isErr()) {
-				break;
-			}
-		}
-
-		return state as MiddlewareEntry;
 	}
 
 	function createChannel(definition: DefinitionMembers, channel: MiddlewareCallback<Callback>) {

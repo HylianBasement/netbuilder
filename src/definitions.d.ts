@@ -14,8 +14,6 @@ export type Check<T> = (value: unknown) => value is T;
 
 export type Static<T> = T extends Check<infer U> ? U : never;
 
-export type Optional<T, K extends keyof T> = Omit<T, K> & Partial<Pick<T, K>>;
-
 export type ThreadResult = Result<[Array<unknown>, (r: unknown) => unknown], string>;
 
 export type ToFixed<T extends Array<any>, U extends Array<any> = []> = LengthEquals<T, U> extends true

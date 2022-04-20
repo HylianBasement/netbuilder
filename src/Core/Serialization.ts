@@ -69,6 +69,15 @@ namespace Serialization {
 		);
 	}
 
+	export function Contains(namespace: DefinitionNamespace, object: object) {
+		const symbols = symbolDictionary(namespace);
+		const map = symbols[SerializationMap] as ISerializationMap;
+
+		const mt = getmetatable(object) as never;
+
+		return mt !== undefined && (map.SerializerClasses.has(mt) || map.Serializables.has(mt));
+	}
+
 	function isSerializedObject(value: defined): value is SerializedObject<defined> {
 		return (
 			type(value) === "table" &&

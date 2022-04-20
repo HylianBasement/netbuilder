@@ -1,33 +1,136 @@
-import { Check } from "../definitions";
+import { Iterator, Option, Result } from "@rbxts/rust-classes";
 
-type TypeCheckingResult =
-	| LuaTuple<[failed: true, errMessage: string]>
-	| LuaTuple<[failed: false, errMessage: undefined]>;
+import { Check, DefinitionNamespace } from "../definitions";
+
+import { IS_SERVER } from "../Util/boundary";
+
+interface Validation {
+	Message: string;
+	Validator: (value: any) => boolean;
+}
+
+type TypeCheckingResult = Result<defined, string>;
+
+const __ = {};
 
 /** @internal */
 namespace TypeChecking {
-	export function Parameters(args: unknown[], checks: ReadonlyArray<Check<any>>) {
-		let errMessage!: string;
+	export function Parameters(
+		isReceiver: boolean,
+		args: unknown[],
+		checks: ReadonlyArray<Check<any>>,
+	): TypeCheckingResult {
+		let i = 0;
 
-		const failed = checks.some((check, i) => {
-			const [result, message] = check(args[i]) as unknown as LuaTuple<[boolean, string?]>;
+		return Iterator.fromItems(...checks)
+			.findMap<TypeCheckingResult>((check) => {
+				const value = args[i++];
+				const validationResult = validate(value, isReceiver);
 
-			if (result === false) {
-				errMessage = `Parameter #${i + 1} ${message ?? "has failed typechecking."}`;
-			}
+				if (validationResult.isErr()) {
+					return Option.some(validationResult);
+				}
 
-			return !result;
-		});
+				if (IS_SERVER) {
+					const [result, message] = check(value) as unknown as LuaTuple<[boolean, string?]>;
 
-		return [failed, errMessage] as TypeCheckingResult;
+					if (result === false) {
+						return Option.some(
+							Result.err(format(`Parameter #${i} has failed typechecking`, message)),
+						);
+					}
+				}
+
+				return Option.none();
+			})
+			.unwrapOr(Result.ok(__));
 	}
 
-	export function ReturnValue(value: unknown, check: Check<any>) {
-		const [result, message = "Return value has failed typechecking."] = check(
-			value,
-		) as unknown as LuaTuple<[boolean, string]>;
+	export function ReturnValue(value: unknown, check: Check<any>): TypeCheckingResult {
+		return validate(value, true).andWith(() => {
+			if (IS_SERVER) {
+				const [result, message] = check(value) as unknown as LuaTuple<[boolean, string?]>;
 
-		return [!result, result ? undefined : message] as unknown as TypeCheckingResult;
+				return result === true
+					? Result.ok(__)
+					: Result.err(format("Return value has failed typechecking", message));
+			}
+
+			return Result.ok(__);
+		});
+	}
+
+	function format(title: string, message?: string) {
+		return `${title}${message ? ": " + message : "."}`;
+	}
+
+	const validationMap = new ReadonlyMap<keyof CheckablePrimitives, Validation[]>([
+		[
+			"function",
+			[
+				{
+					Message: "Functions cannot be replicated across server and client.",
+					Validator: fails,
+				},
+			],
+		],
+		[
+			"thread",
+			[
+				{
+					Message: "Threads cannot be replicated across server and client.",
+					Validator: fails,
+				},
+			],
+		],
+		[
+			"table",
+			[
+				// Metatables
+				{
+					Message:
+						"Please, consider serializing your tables before sending them across server and client.",
+					Validator: (tbl: object) => getmetatable(tbl) === undefined,
+				},
+				// Mixed tables
+				{
+					Message: "Replicating mixed tables across server and client is not supported.",
+					Validator: (tbl: Map<defined, unknown>) => {
+						const keyTypes = new Set<keyof CheckablePrimitives>();
+
+						for (const [k] of tbl) {
+							keyTypes.add(type(k));
+						}
+
+						return keyTypes.size() < 2;
+					},
+				},
+			],
+		],
+	]);
+
+	function fails() {
+		return false;
+	}
+
+	function validate(value: unknown, isReceiver: boolean): TypeCheckingResult {
+		if (isReceiver) {
+			return Result.ok(__);
+		}
+
+		const valueType = type(value);
+
+		if (validationMap.has(valueType)) {
+			const entries = validationMap.get(valueType)!;
+
+			for (const { Validator, Message } of entries) {
+				if (Validator(value) === false) {
+					return Result.err(Message);
+				}
+			}
+		}
+
+		return Result.ok(__);
 	}
 }
 
