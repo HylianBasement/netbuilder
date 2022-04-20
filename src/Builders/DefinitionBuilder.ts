@@ -7,6 +7,8 @@ import {
 	Static,
 } from "../definitions";
 
+import { Timeout } from "../Util/constants";
+
 interface AsyncFunctionOptions {
 	Timeout: number;
 }
@@ -22,7 +24,7 @@ class DefinitionBuilder<
 
 	private returnValueCheck = (value: unknown) => value === undefined;
 
-	private timeout = 60;
+	private timeout = Timeout.AsyncFunctionDefault;
 
 	private parameterChecks = new Array<Check<any>>();
 

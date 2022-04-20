@@ -17,7 +17,7 @@ import GlobalMiddleware from "../Symbol/GlobalMiddleware";
 import definitionInfo from "../Util/definitionInfo";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import symbolDictionary from "../Util/symbolDictionary";
-import { __, IS_SERVER } from "../Util/constants";
+import { __, IS_SERVER, Timeout } from "../Util/constants";
 
 interface FunctionState {
 	CurrentParameters: ReadonlyArray<unknown>;
@@ -35,9 +35,7 @@ const Players = game.GetService("Players");
 
 /** @internal */
 namespace Middleware {
-	export const timeout = 60;
-
-	export const timeoutMsg = `middleware processing has timed out. (${Middleware.timeout}s)`;
+	export const timeoutMsg = `middleware processing has timed out. (${Timeout.Middleware}s)`;
 
 	export function CreateReceiver<F extends Callback>(
 		definition: DefinitionMembers,
@@ -211,7 +209,7 @@ namespace Middleware {
 				return result;
 			}),
 			new Instance("BindableEvent"),
-			Promise.delay(Middleware.timeout).andThenReturn(Middleware.timeoutMsg),
+			Promise.delay(Timeout.Middleware).andThenReturn(Middleware.timeoutMsg),
 		] as const)
 			.then(([ch, co, bindable, timeout]) => {
 				let isDone = false;

@@ -18,7 +18,7 @@ import isRemoteFunction from "../Util/isRemoteFunction";
 import netBuilderError from "../Util/netBuilderError";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import promiseYield from "../Util/promiseYield";
-import { IS_RUNNING, IS_SERVER } from "../Util/boundary";
+import { IS_RUNNING, IS_SERVER, Timeout } from "../Util/constants";
 
 const Players = game.GetService("Players");
 
@@ -28,14 +28,19 @@ const Players = game.GetService("Players");
 class ServerDispatcher<F extends Callback> {
 	private readonly remote = OptionMut.none<Remote<F>>();
 
-	private readonly timeout = 60;
+	private timeout: number;
 
-	private readonly warningTimeout = 15;
+	private warningTimeout: number;
 
 	public constructor(private readonly definition: DefinitionMembers) {
 		if (!IS_SERVER) {
 			netBuilderError(definition, "This dispatcher can be only created on the server.", 3);
 		}
+
+		const timeout = definition.Timeout;
+
+		this.timeout = timeout;
+		this.warningTimeout = timeout / 2 >= Timeout.AsyncFunctionMin ? timeout / 2 : math.huge;
 	}
 
 	private getOrCreateRemote() {

@@ -17,6 +17,7 @@ import getRemoteInstanceKind from "../Util/getRemoteInstanceKind";
 import definitionInfo from "../Util/definitionInfo";
 import netBuilderError from "../Util/netBuilderError";
 import symbolDictionary from "../Util/symbolDictionary";
+import { Timeout } from "../Util/constants";
 
 interface TreeNode {
 	Name: string;
@@ -187,9 +188,10 @@ class RemoteResolver<F extends Callback> {
 
 					remote ? res(remote) : rej();
 				}),
-			50,
+			math.huge,
 			math.pi / 100,
 		)
+			.timeout(Timeout.Remote)
 			.catch(() =>
 				netBuilderWarn(definition, `Could not find ${definitionInfo(definition)} in the tree.`),
 			)

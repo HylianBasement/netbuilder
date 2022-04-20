@@ -16,7 +16,7 @@ import isRemoteFunction from "../Util/isRemoteFunction";
 import netBuilderError from "../Util/netBuilderError";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import promiseYield from "../Util/promiseYield";
-import { IS_CLIENT } from "../Util/boundary";
+import { IS_CLIENT, Timeout } from "../Util/constants";
 
 const player = game.GetService("Players").LocalPlayer;
 
@@ -26,14 +26,19 @@ const player = game.GetService("Players").LocalPlayer;
 class ClientDispatcher<F extends Callback> {
 	private remote: Remote<F> | undefined;
 
-	private readonly timeout = 60;
+	private timeout: number;
 
-	private readonly warningTimeout = 15;
+	private warningTimeout: number;
 
 	public constructor(private readonly definition: DefinitionMembers) {
 		if (!IS_CLIENT) {
 			netBuilderError(this.definition, "This dispatcher can be only created on the client.", 3);
 		}
+
+		const timeout = definition.Timeout;
+
+		this.timeout = timeout;
+		this.warningTimeout = timeout / 2 >= Timeout.AsyncFunctionMin ? timeout / 2 : math.huge;
 	}
 
 	private tryFindRemote() {
