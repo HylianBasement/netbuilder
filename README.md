@@ -113,7 +113,7 @@ Client.Player.GetStatus.Call(); // { Level: 1, Atk: 25, Def: 10 }
 
 // Server-side
 import { Server } from "shared/Remotes";
-import getPlayerStatus from "shared/PlayerData";
+import { getPlayerStatus } from "shared/PlayerData";
 
 Server.PrintMessage.Connect(print);
 Server.Player.GetStatus.SetCallback(getPlayerStatus);
@@ -121,9 +121,9 @@ Server.Player.GetStatus.SetCallback(getPlayerStatus);
 
 Alternatively, we can also send requests by directly calling a definition. The method used to call the definition will depend on its kind.
 
-- Event -> `Send`
-- Function -> `Call`
-- AsyncFunction -> `CallAsync`
+- **Event** -> `Send`
+- **Function** -> `Call`
+- **AsyncFunction** -> `CallAsync`
 
 ```js
 Client.PrintMessage("Hello world!");
@@ -134,7 +134,7 @@ Once the game starts, the remote instances are automatically generated in a fold
 
 ![Generated Remotes S1](assets/generated_remotes1.png)
 
-However, the library only generates remote instances from definitions that are registered via `Server.Create<...>`, which means that if we use the above example, it'll likely only generate two remote instances:
+However, the library only generates remote instances from definitions that are actually being used, which means that in the case of the first example showed, it'll likely only generate two remote instances:
 
 ![Generated Remotes S2](assets/generated_remotes2.png)
 
