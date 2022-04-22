@@ -13,12 +13,12 @@ export = new NetBuilder()
 				Warn: (def, ...params) => Log.Warn(`[${def.Id}]`, ...params),
 			}),
 	)
-	.AddDefinition(new DefinitionBuilder("PrintOnClient").SetArguments(t.string).Build())
-	.AddNamespace(
+	.BindDefinition(new DefinitionBuilder("PrintOnClient").SetArguments(t.string).Build())
+	.BindNamespace(
 		"People",
 		new NetBuilder()
 			.UseSerialization([Person])
-			.AddDefinition(
+			.BindDefinition(
 				new DefinitionBuilder("VerifyAge")
 					.SetArguments(Person.Type)
 					.SetReturn(t.boolean)

@@ -212,8 +212,8 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 		return assign(dict, {});
 	}
 
-	/** Adds a definition to the namespace. */
-	public AddDefinition<D extends Definition>(definition: D) {
+	/** Binds a definition to the namespace. */
+	public BindDefinition<D extends Definition>(definition: D) {
 		this.definitions.push(definition);
 
 		return this as unknown as NetBuilder<
@@ -222,8 +222,8 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 		>;
 	}
 
-	/** Adds a child definition namespace. */
-	public AddNamespace<S extends string, N extends DefinitionNamespace>(name: S, space: N) {
+	/** Binds a child definition namespace. */
+	public BindNamespace<S extends string, N extends DefinitionNamespace>(name: S, space: N) {
 		this.namespaces.push({ name, space });
 
 		return this as unknown as NetBuilder<Reconstruct<R & { readonly [_ in S]: N }>, O>;
@@ -265,7 +265,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 		>;
 	}
 
-	/** Adds a list serializers to the registry. Whenever a request is made, parameters and return values are (de)serialized if they match any of the provided serializable classes. */
+	/** Sets a list serializers to the registry. Whenever a request is made, parameters and return values are (de)serialized if they match any of the provided serializable classes. */
 	public UseSerialization(classes: SerializableObject[]) {
 		this.serializableClasses = classes.filter(
 			(v) => !Serialization.IsSerializer(v),

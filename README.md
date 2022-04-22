@@ -58,11 +58,12 @@ In NetBuilder, a remote instance is only registered and generated if the same is
 
 ### Creating definitions
 The syntax for creating definitions is pretty straight forward. First we must instantiate `NetBuilder`, which is going to be our point of entry for adding definitions.
-Definition builders are abstract, we have `EventBuilder` for RemoteEvents and `FunctionBuilder` for RemoteFunctions.
+
+Definition builders are abstract, we have `DefinitionBuilder`, which by default builds RemoteEvents. That can be changed by chaining specific methods that changes the definition's behaviour, such as `SetReturn` and `Async`.
 
 By default, the definitions must have typecheckers for every parameter and return value set.
-Both builders have a `SetArguments` method. This method takes a list of type checkers to construct its type definition.
-Return value type checkers are set via `SetReturn`. For the type checkers, it's recommended to use something like [t](https://github.com/osyrisrblx/t).
+Both builders have a `SetArguments` method. This method takes a list of typecheckers to construct its type definition.
+Return value typecheckers are set via `SetReturn`. For the typecheckers, it's recommended to use a library like [t](https://github.com/osyrisrblx/t).
 
 It's also possible to add a namespace that contains another dictionary of remote definitions created by a `NetBuilder` class.
 
@@ -70,29 +71,29 @@ It's also possible to add a namespace that contains another dictionary of remote
 import { NetBuilder, DefinitionBuilder } from "@rbxts/netbuilder";
 
 export = new NetBuilder()
-	.AddDefinition(new DefinitionBuilder("PrintMessage").SetArguments(t.string).Build())
-	.AddDefinition(
+	.BindDefinition(new DefinitionBuilder("PrintMessage").SetArguments(t.string).Build())
+	.BindDefinition(
 		new DefinitionBuilder("Sum").SetArguments(t.number, t.number).SetReturn(t.number).Build(),
 	)
-	.AddNamespace(
+	.BindNamespace(
 		"Player",
 		new NetBuilder()
-			.AddDefinition(new DefinitionBuilder("ConsumeItem").SetArguments(t.number).Build())
-			.AddDefinition(new DefinitionBuilder("GetStatus").SetReturn(t.PlayerStatus).Build())
+			.BindDefinition(new DefinitionBuilder("ConsumeItem").SetArguments(t.number).Build())
+			.BindDefinition(new DefinitionBuilder("GetStatus").SetReturn(t.PlayerStatus).Build())
 			.AsNamespace(),
 	)
-	.AddNamespace(
+	.BindNamespace(
 		"Party",
 		new NetBuilder()
-			.AddDefinition(
+			.BindDefinition(
 				new DefinitionBuilder("Create")
 					.SetArguments(t.PartyInfoCreator)
 					.SetReturn(t.Party)
 					.Build(),
 			)
-			.AddDefinition(new DefinitionBuilder("Disband").SetArguments(t.number).Build())
-			.AddDefinition(new DefinitionBuilder("SendJoinRequest").SetArguments(t.number).Build())
-			.AddDefinition(new DefinitionBuilder("SendInvite").SetArguments(t.number, t.number).Build())
+			.BindDefinition(new DefinitionBuilder("Disband").SetArguments(t.number).Build())
+			.BindDefinition(new DefinitionBuilder("SendJoinRequest").SetArguments(t.number).Build())
+			.BindDefinition(new DefinitionBuilder("SendInvite").SetArguments(t.number, t.number).Build())
 			.AsNamespace(),
 	)
 	.Build();
@@ -116,6 +117,17 @@ import getPlayerStatus from "shared/PlayerData";
 
 Server.PrintMessage.Connect(print);
 Server.Player.GetStatus.SetCallback(getPlayerStatus);
+```
+
+Alternatively, we can also send requests by directly calling a definition. The method used to call the definition will depend on its kind.
+
+- Event -> `Send`
+- Function -> `Call`
+- AsyncFunction -> `CallAsync`
+
+```js
+Client.PrintMessage("Hello world!");
+Client.Player.GetStatus();
 ```
 
 Once the game starts, the remote instances are automatically generated in a folder named `NetBuilderRemotes`, located in `ReplicatedStorage`. A way to change the location of the instances will be explained later.
@@ -142,7 +154,7 @@ new NetBuilder()
 		RootInstance: (rs) => rs.WaitForChild("MyRemotes"),
 		SupressWarnings: true,
 	})
-	.AddNamespace("Foo",
+	.BindNamespace("Foo",
 		new NetBuilder()
 			.Configure({
 				RootInstance: (rs) => rs.WaitForChild("FooRemotes"),
@@ -163,7 +175,7 @@ The middlewares used in the below example are `RateLimiter`, which limits how ma
 
 ```js
 new NetBuilder()
-	.AddDefinition(
+	.BindDefinition(
 		new DefinitionBuilder("Print")
 			.SetArguments(t.string)
 			.UseMiddleware([
@@ -188,13 +200,13 @@ new NetBuilder()
 			),
 		),
 	])
-	.AddDefinition(
+	.BindDefinition(
 		new DefinitionBuilder("Print")
 			.SetArguments(t.string)
 			.UseMiddleware([RateLimiter({ MaxPerMinute: 5 })])
 			.Build()
 	)
-	.AddDefinition(
+	.BindDefinition(
 		new DefinitionBuilder("Sum")
 			.SetArguments(t.number, t.number)
 			.SetReturn(t.number)
@@ -332,7 +344,7 @@ import RustResult from "../Serializer/RustResult";
 
 export = new NetBuilder()
 	.UseSerialization([Person, RustResult])
-	.AddDefinition(
+	.BindDefinition(
 		new DefinitionBuilder("Introduction")
 			.SetArguments(t.Person)
 			.SetReturn(t.RustResult)

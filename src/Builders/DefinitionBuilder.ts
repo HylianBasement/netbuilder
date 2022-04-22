@@ -44,7 +44,7 @@ class DefinitionBuilder<
 		return "NetBuilder.DefinitionBuilder";
 	}
 
-	/** Applies an ordered list of type checkers for the callback parameters. */
+	/** Applies an ordered list of typecheckers for the callback parameters. */
 	public SetArguments<T extends Array<Check<any>>>(...checks: T) {
 		this.parameterChecks = checks;
 
@@ -59,7 +59,7 @@ class DefinitionBuilder<
 		>;
 	}
 
-	/** Applies a type check for the callback's return value. */
+	/** Applies a typecheck for the callback's return value. */
 	public SetReturn<T extends Check<any>>(check: T) {
 		this.kind = "Function";
 		this.returnValueCheck = check;
@@ -105,10 +105,5 @@ class DefinitionBuilder<
 		} as unknown as Definition<I, K, D>;
 	}
 }
-
-// new DefinitionBuilder("Tet")
-// 	.SetReturn(((v: unknown) => v === 2) as (x: unknown) => x is number)
-// 	.Async({ Timeout: 5 })
-// 	.Build();
 
 export = DefinitionBuilder;
