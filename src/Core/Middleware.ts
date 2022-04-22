@@ -162,7 +162,7 @@ namespace Middleware {
 		] as Array<NetBuilderMiddleware>;
 
 		return Vec.fromPtr([...definition.Middlewares, ...globalMiddlewares])
-			.dedupBy(({ Id: i1 }, { Id: i2 }) => i1 === i2)
+			.dedupByKey(({ Id }) => Id)
 			.iter();
 	}
 
