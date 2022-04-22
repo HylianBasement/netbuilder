@@ -1,7 +1,7 @@
 {
   "name": "@rbxts/netbuilder",
-  "version": "0.1.0",
-  "description": "Networking library for roblox",
+  "version": "0.2.0",
+  "description": "Abstract and declarative networking library for Roblox",
   "main": "out/init.lua",
   "scripts": {
     "build": "rbxtsc --verbose",
