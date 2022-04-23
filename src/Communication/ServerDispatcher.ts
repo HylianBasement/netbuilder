@@ -23,7 +23,6 @@ import { IS_RUNNING, IS_SERVER, Timeout } from "../Util/constants";
 const Players = game.GetService("Players");
 
 /** Definition manager responsible for processing server events and functions.
- * @internal
  */
 class ServerDispatcher<F extends Callback> {
 	private readonly remote = OptionMut.none<Remote<F>>();

@@ -6,6 +6,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.2.1] - 2022-04-23
+### Fixed
+- Fixed `ClientDispatcher` and `ServerDispatcher` types not being emitted.
+
 ## [0.2.0] - 2022-04-22
 ### Added
 - Added `NetBuilder.CreateTypeChecker`

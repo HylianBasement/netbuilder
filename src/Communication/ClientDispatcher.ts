@@ -21,7 +21,6 @@ import { IS_CLIENT, Timeout } from "../Util/constants";
 const player = game.GetService("Players").LocalPlayer;
 
 /** Definition manager responsible for processing client events and async functions.
- * @internal
  */
 class ClientDispatcher<F extends Callback> {
 	private remote: Remote<F> | undefined;
