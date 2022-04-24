@@ -1,8 +1,8 @@
-import { Iterator, Option, Result } from "@rbxts/rust-classes";
+import { Iterator, Option, Result, unit } from "@rbxts/rust-classes";
 
 import { Check } from "../definitions";
 
-import { __, IS_SERVER } from "../Util/constants";
+import { IS_SERVER } from "../Util/constants";
 
 interface Validation {
 	Message: string;
@@ -41,7 +41,7 @@ namespace TypeChecking {
 
 				return Option.none();
 			})
-			.unwrapOr(Result.ok(__));
+			.unwrapOr(Result.ok(unit()));
 	}
 
 	export function ReturnValue(value: unknown, check: Check<any>): TypeCheckingResult {
@@ -50,11 +50,11 @@ namespace TypeChecking {
 				const [result, message] = check(value) as unknown as LuaTuple<[boolean, string?]>;
 
 				return result === true
-					? Result.ok(__)
+					? Result.ok(unit())
 					: Result.err(format("Return value has failed typechecking", message));
 			}
 
-			return Result.ok(__);
+			return Result.ok(unit());
 		});
 	}
 
@@ -113,7 +113,7 @@ namespace TypeChecking {
 
 	function validate(value: unknown, isReceiver: boolean): TypeCheckingResult {
 		if (isReceiver) {
-			return Result.ok(__);
+			return Result.ok(unit());
 		}
 
 		const valueType = type(value);
@@ -128,7 +128,7 @@ namespace TypeChecking {
 			}
 		}
 
-		return Result.ok(__);
+		return Result.ok(unit());
 	}
 }
 

@@ -1,4 +1,4 @@
-import { Result, Vec } from "@rbxts/rust-classes";
+import { Result, Vec, unit } from "@rbxts/rust-classes";
 
 import {
 	NetBuilderMiddleware,
@@ -17,7 +17,7 @@ import GlobalMiddleware from "../Symbol/GlobalMiddleware";
 import definitionInfo from "../Util/definitionInfo";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import symbolDictionary from "../Util/symbolDictionary";
-import { __, IS_SERVER, Timeout } from "../Util/constants";
+import { IS_SERVER, Timeout } from "../Util/constants";
 
 interface FunctionState {
 	CurrentParameters: ReadonlyArray<unknown>;
@@ -120,7 +120,7 @@ namespace Middleware {
 
 		const [parameterChecks] = definition.Checks;
 
-		return Result.ok(__)
+		return Result.ok(unit())
 			.andWith(() => {
 				return TypeChecking.Parameters(false, newArgs, parameterChecks)
 					.mapErr((message) => {
@@ -128,7 +128,7 @@ namespace Middleware {
 
 						return message;
 					})
-					.and(Result.ok(__));
+					.and(Result.ok(unit()));
 			})
 			.andWith(() => {
 				state.ReturnCallbacks.unshift((r) =>
