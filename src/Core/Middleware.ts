@@ -67,7 +67,7 @@ namespace Middleware {
 						Serialization.Deserialize(definition.Namespace, v),
 					);
 
-					return TypeChecking.Parameters(true, newArgs, parameterChecks)
+					return TypeChecking.Parameters(newArgs, parameterChecks, true)
 						.mapErr((message) => {
 							warnForEvents(definition, message);
 
@@ -122,7 +122,7 @@ namespace Middleware {
 
 		return Result.ok(unit())
 			.andWith(() => {
-				return TypeChecking.Parameters(false, newArgs, parameterChecks)
+				return TypeChecking.Parameters(newArgs, parameterChecks, false)
 					.mapErr((message) => {
 						warnForEvents(definition, message);
 

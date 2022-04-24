@@ -14,9 +14,9 @@ type TypeCheckingResult = Result<defined, string>;
 /** @internal */
 namespace TypeChecking {
 	export function Parameters(
-		isReceiver: boolean,
 		args: unknown[],
 		checks: ReadonlyArray<Check<any>>,
+		isReceiver: boolean,
 	): TypeCheckingResult {
 		let i = 0;
 
