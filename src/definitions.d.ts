@@ -119,6 +119,8 @@ export type Remote<F extends Callback = Callback> = RemoteEvent<F> | RemoteFunct
 
 export type DefinitionKind = "Event" | "Function" | "AsyncFunction";
 
+export type TypeCheckingResult = Result<defined, string>;
+
 export interface Definition<
 	I extends string = string,
 	K extends DefinitionKind = DefinitionKind,
