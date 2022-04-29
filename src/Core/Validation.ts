@@ -2,13 +2,13 @@ import { Result, unit } from "@rbxts/rust-classes";
 
 import { TypeCheckingResult } from "../definitions";
 
-interface Validation {
+interface ValidationEntry {
 	Message: string;
 	Validator: (value: any) => boolean;
 }
 
 /** @internal */
-namespace Validator {
+namespace Validation {
 	export function Validate(value: unknown, isReceiver: boolean): TypeCheckingResult {
 		if (isReceiver) {
 			return Result.ok(unit());
@@ -33,7 +33,7 @@ namespace Validator {
 		return false;
 	}
 
-	const validationMap = new ReadonlyMap<keyof CheckablePrimitives, Validation[]>([
+	const validationMap = new ReadonlyMap<keyof CheckablePrimitives, ValidationEntry[]>([
 		[
 			"function",
 			[
@@ -79,4 +79,4 @@ namespace Validator {
 	]);
 }
 
-export = Validator;
+export = Validation;

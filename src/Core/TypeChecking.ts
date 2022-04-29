@@ -4,7 +4,7 @@ import { Check, TypeCheckingResult } from "../definitions";
 
 import { IS_SERVER } from "../Util/constants";
 
-import Validator from "./Validator";
+import Validation from "./Validation";
 
 /** @internal */
 namespace TypeChecking {
@@ -18,7 +18,7 @@ namespace TypeChecking {
 		return Iterator.fromItems(...checks)
 			.findMap<TypeCheckingResult>((check) => {
 				const value = args[i++];
-				const validationResult = Validator.Validate(value, isReceiver);
+				const validationResult = Validation.Validate(value, isReceiver);
 
 				if (validationResult.isErr()) {
 					return Option.some(validationResult);
@@ -40,7 +40,7 @@ namespace TypeChecking {
 	}
 
 	export function ReturnValue(value: unknown, check: Check<any>): TypeCheckingResult {
-		return Validator.Validate(value, true).andWith(() => {
+		return Validation.Validate(value, true).andWith(() => {
 			if (IS_SERVER) {
 				const [result, message] = check(value) as unknown as LuaTuple<[boolean, string?]>;
 
