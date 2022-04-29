@@ -17,6 +17,7 @@ import {
 	InferDefinitionKind,
 	ServerDefinition,
 	ClientDefinition,
+	SerializationDefinition,
 } from "../definitions";
 
 import ConfigurationBuilder from "./ConfigurationBuilder";
@@ -73,8 +74,8 @@ type NetBuilderMiddlewareOptions = {
 );
 
 interface NetBuilderSerializerCreator<S> {
-	Serialize(this: void, value: defined): S;
-	Deserialize(this: void, serialized: S): defined;
+	Serialize(this: void, value: defined, definition: SerializationDefinition): S;
+	Deserialize(this: void, serialized: S, definition: SerializationDefinition): defined;
 }
 
 interface Cache<R extends DefinitionNamespace> {
@@ -165,17 +166,17 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 	): NetBuilderSerializer<S> {
 		return {
 			Class: object,
-			Serialization(namespace, value) {
+			Serialization(namespace, value, definition) {
 				return {
 					SerializationType: SerializationType.Custom,
 					SerializationId: (
 						symbolDictionary(namespace)[SerializationMap] as ISerializationMap
 					).SerializerClasses.get(object as never)!.Id,
-					Value: methods.Serialize(value),
+					Value: methods.Serialize(value, definition),
 				};
 			},
-			Deserialization(serialized: S) {
-				return methods.Deserialize(serialized);
+			Deserialization(serialized: S, definition) {
+				return methods.Deserialize(serialized, definition);
 			},
 		};
 	}

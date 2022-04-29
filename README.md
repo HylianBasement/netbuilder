@@ -1,6 +1,6 @@
 <div>
 	<h1><code>NetBuilder</code></h1>
-	<p>Networking library for roblox.</p>
+	<h3>Abstract and declarative networking library for Roblox.</h3>
 </div>
 
 ---

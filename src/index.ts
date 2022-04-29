@@ -4,11 +4,15 @@ import DefinitionBuilder from "./Builders/DefinitionBuilder";
 import RateLimiter from "./Middleware/RateLimiter";
 import Tracer from "./Middleware/Tracer";
 
+import Serialization from "./Core/Serialization";
+
 export type {
 	Serializable,
+	MiddlewareCallback,
 	NetBuilderResult,
 	NetBuilderMiddleware,
-	MiddlewareCallback,
+	SerializationDefinition,
+	SerializedObject,
 } from "./definitions";
 
 /* eslint-disable prettier/prettier */
@@ -20,5 +24,8 @@ export {
 	// Middlewares
 	RateLimiter,
 	Tracer,
+
+	// Util
+	Serialization,
 };
 /* eslint-enable prettier/prettier */

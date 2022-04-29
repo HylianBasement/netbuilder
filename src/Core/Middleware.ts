@@ -52,6 +52,7 @@ namespace Middleware {
 			});
 
 			const [parameterChecks, returnValueCheck] = definition.Checks;
+			const seriDef = Serialization.CreateSerializationDefinition(definition);
 
 			const executeFn = (...a: unknown[]) =>
 				awaitPromiseDeep(IS_SERVER ? callback(player, ...a) : callback(...a));
@@ -66,7 +67,7 @@ namespace Middleware {
 			})
 				.andWith(() => {
 					const newArgs = (state.CurrentParameters as defined[]).map((v) =>
-						Serialization.Deserialize(definition.Namespace, v),
+						Serialization.Deserialize(seriDef, v),
 					);
 
 					return TypeChecking.Parameters(newArgs, parameterChecks, true)
@@ -81,9 +82,7 @@ namespace Middleware {
 						.andWith(() => Result.ok(executeFn(...newArgs)));
 				})
 				.andWith((returnValue) => {
-					state.ReturnCallbacks.unshift((r) =>
-						Serialization.Serialize(definition.Namespace, r as never),
-					);
+					state.ReturnCallbacks.unshift((r) => Serialization.Serialize(seriDef, r as never));
 
 					return (
 						definition.Kind !== "Event"
@@ -116,10 +115,10 @@ namespace Middleware {
 			Arguments: args,
 		});
 
+		const seriDef = Serialization.CreateSerializationDefinition(definition);
 		const newArgs = (state.CurrentParameters as defined[]).map((v) =>
-			Serialization.Serialize(definition.Namespace, v),
+			Serialization.Serialize(seriDef, v),
 		);
-
 		const [parameterChecks] = definition.Checks;
 
 		return Result.ok(unit())
@@ -133,9 +132,7 @@ namespace Middleware {
 					.and(Result.ok(unit()));
 			})
 			.andWith(() => {
-				state.ReturnCallbacks.unshift((r) =>
-					Serialization.Deserialize(definition.Namespace, r as never),
-				);
+				state.ReturnCallbacks.unshift((r) => Serialization.Deserialize(seriDef, r as never));
 
 				return state.Result;
 			})

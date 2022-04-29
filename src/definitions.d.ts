@@ -38,26 +38,31 @@ export const enum SerializationType {
 	Implemented,
 }
 
-export interface SerializedObject<S extends object = object> {
+/** Interface for implementing serializable classes. */
+export type Serializable<T extends object> = Deserialize &
+	Partial<Reconstruct<UnionToIntersection<SerializableClassInstance<T>>>>;
+
+/** Serialized object representation of a specific class. */
+export interface SerializedObject<S extends object> {
 	readonly SerializationType: SerializationType;
 	readonly SerializationId: number;
 	readonly Value: S;
 }
 
-export type SerializableClassInstance = { Serialize(): object } | { serialize(): object };
-
-export type Serializable<T extends object> = Deserialize & {
-	Serialize?(): T;
-	serialize?(): T;
-};
+export type SerializableClassInstance<T = object> =
+	| { Serialize(definition: SerializationDefinition): T }
+	| { serialize(definition: SerializationDefinition): T };
 
 export class Deserialize {
-	public static deserialize(serialized: object): SerializableClassInstance;
+	public static deserialize(
+		serialized: object,
+		definition: SerializationDefinition,
+	): SerializableClassInstance;
 }
 
 export interface SerializableClass extends Deserialize {
 	new (...args: Array<any>): SerializableClassInstance;
-	deserialize(serialized: object): SerializableClassInstance;
+	deserialize(serialized: object, definition: SerializationDefinition): SerializableClassInstance;
 }
 
 export interface SerializationMap {
@@ -68,12 +73,17 @@ export interface SerializationMap {
 
 export interface NetBuilderSerializer<S extends defined> {
 	readonly Class: object;
-	Serialization(namespace: DefinitionNamespace, value: object): SerializedObject<S>;
-	Deserialization(serialized: S): object;
+	Serialization(
+		namespace: DefinitionNamespace,
+		value: object,
+		definition: SerializationDefinition,
+	): SerializedObject<S>;
+	Deserialization(serialized: S, definition: SerializationDefinition): object;
 }
 
 export type SerializableObject = NetBuilderSerializer<defined> | SerializableClass;
 
+/** Raw result object type. */
 export type NetBuilderResult<T> =
 	| {
 			Type: "Ok";
@@ -101,6 +111,7 @@ export interface NetBuilderConfiguration {
 	Logger?: NetBuilderLogger;
 }
 
+/** Middleware entry type. */
 export type NetBuilderMiddleware<F extends Callback = Callback> = ObjectDispatcher<
 	MiddlewareCallback<F>,
 	MiddlewareCallback<F>
@@ -109,6 +120,7 @@ export type NetBuilderMiddleware<F extends Callback = Callback> = ObjectDispatch
 	GlobalEnabled: boolean;
 };
 
+/** Callback that is executed on a middleware check. */
 export type MiddlewareCallback<F extends Callback> = (
 	definition: DefinitionMembers,
 	process: (params: Parameters<F>, returnValue?: (value: ReturnType<F>) => unknown) => never,
@@ -148,9 +160,15 @@ export interface BuilderMembers {
 	kind: DefinitionKind;
 }
 
+/** Definition variant for logging related operations. */
 export interface LoggingDefinition {
 	readonly Id: string;
 	readonly Kind: DefinitionKind;
+}
+
+/** Definition variant for serialization related operations. */
+export interface SerializationDefinition extends LoggingDefinition {
+	readonly Namespace: DefinitionNamespace;
 }
 
 export type ClientDefinition<K extends DefinitionKind, D> = D extends ClientDispatcher<any>

@@ -1,6 +1,6 @@
 {
   "name": "@rbxts/netbuilder",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "description": "Abstract and declarative networking library for Roblox",
   "main": "out/init.lua",
   "scripts": {
@@ -48,6 +48,6 @@
     "typescript": "^4.6.2"
   },
   "dependencies": {
-    "@rbxts/rust-classes": "^0.11.1"
+    "@rbxts/rust-classes": "^0.11.2"
   }
 }
