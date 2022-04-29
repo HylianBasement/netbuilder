@@ -282,7 +282,6 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 
 		// eslint-disable-next-line roblox-ts/no-array-pairs
 		for (const [i, obj] of ipairs(this.serializers)) {
-			print(obj);
 			this.serializationMap.Serializers.set(obj, i);
 			this.serializationMap.SerializerClasses.set(obj.Class, { Serializer: obj, Id: i });
 		}
