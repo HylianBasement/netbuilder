@@ -31,6 +31,8 @@ interface DefinitionEntry {
 	Arguments: Array<unknown>;
 }
 
+type SenderResult = Result<[unknown[], (r: unknown) => unknown], string>;
+
 const Players = game.GetService("Players");
 
 /** @internal */
@@ -83,21 +85,21 @@ namespace Middleware {
 						Serialization.Serialize(definition.Namespace, r as never),
 					);
 
-					if (definition.Kind !== "Event") {
-						const result = TypeChecking.ReturnValue(returnValue, returnValueCheck);
-
-						if (result.isErr()) {
-							return result.mapErr((message) => ({
-								Type: "Err",
-								Message: message,
-							}));
-						}
-					}
-
-					return Result.ok({
-						Type: "Ok",
-						Data: state.ReturnCallbacks.reduce((acc, fn) => fn(acc), returnValue),
-					});
+					return (
+						definition.Kind !== "Event"
+							? TypeChecking.ReturnValue(returnValue, returnValueCheck).mapErr(
+									(message) => ({
+										Type: "Err",
+										Message: message,
+									}),
+							  )
+							: Result.ok(unit())
+					).andWith(() =>
+						Result.ok({
+							Type: "Ok",
+							Data: state.ReturnCallbacks.reduce((acc, fn) => fn(acc), returnValue),
+						}),
+					) as never;
 				})
 				.asPtr() as NetBuilderResult<unknown>;
 		};
@@ -107,7 +109,7 @@ namespace Middleware {
 		player: Player,
 		definition: DefinitionMembers,
 		...args: unknown[]
-	): Result<[unknown[], (r: unknown) => unknown], string> {
+	): SenderResult {
 		const state = resolveMiddlewares(player, {
 			Definition: definition,
 			Kind: "Send",
@@ -137,12 +139,12 @@ namespace Middleware {
 
 				return state.Result;
 			})
-			.and(
+			.andWith(() =>
 				Result.ok([
 					newArgs,
 					(r: unknown) => state.ReturnCallbacks.reduce((acc, fn) => fn(acc), r),
 				]),
-			) as Result<[defined[], (r: unknown) => unknown], string>;
+			) as SenderResult;
 	}
 
 	function awaitPromiseDeep<T>(promise: T | Promise<T>): T {
