@@ -6,6 +6,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.2.2] - 2022-04-28
+### Changed
+- Internal improvements on middleware code.
+- Updated the readme file to be a bit more consistent.
+
+### Fixed
+- Fixed serialization not working for serializers.
+
 ## [0.2.1] - 2022-04-23
 ### Fixed
 - Fixed `ClientDispatcher` and `ServerDispatcher` types not being emitted.

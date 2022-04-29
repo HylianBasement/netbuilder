@@ -69,6 +69,7 @@ It's also possible to add a namespace that contains another dictionary of remote
 
 ```js
 import { NetBuilder, DefinitionBuilder } from "@rbxts/netbuilder";
+import { t } from "@rbxts/t";
 
 export = new NetBuilder()
 	.BindDefinition(new DefinitionBuilder("PrintMessage").SetArguments(t.string).Build())
@@ -79,7 +80,7 @@ export = new NetBuilder()
 		"Player",
 		new NetBuilder()
 			.BindDefinition(new DefinitionBuilder("ConsumeItem").SetArguments(t.number).Build())
-			.BindDefinition(new DefinitionBuilder("GetStatus").SetReturn(t.PlayerStatus).Build())
+			.BindDefinition(new DefinitionBuilder("GetStatus").SetReturn(TypeCheck.PlayerStatus).Build())
 			.AsNamespace(),
 	)
 	.BindNamespace(
@@ -87,8 +88,8 @@ export = new NetBuilder()
 		new NetBuilder()
 			.BindDefinition(
 				new DefinitionBuilder("Create")
-					.SetArguments(t.PartyInfoCreator)
-					.SetReturn(t.Party)
+					.SetArguments(TypeCheck.PartyInfoCreator)
+					.SetReturn(TypeCheck.Party)
 					.Build(),
 			)
 			.BindDefinition(new DefinitionBuilder("Disband").SetArguments(t.number).Build())
@@ -106,17 +107,17 @@ To use the definitions we have stored, there are dispatchers for both sides that
 
 ```js
 // Client-side
-import { Client } from "shared/Remotes";
+import Definitions from "shared/Remotes";
 
-Client.PrintMessage.Send("Hello world!");
-Client.Player.GetStatus.Call(); // { Level: 1, Atk: 25, Def: 10 }
+Definitions.Client.PrintMessage.Send("Hello world!");
+Definitions.Client.Player.GetStatus.Call(); // { Level: 1, Atk: 25, Def: 10 }
 
 // Server-side
-import { Server } from "shared/Remotes";
+import Definitions from "shared/Remotes";
 import { getPlayerStatus } from "shared/PlayerData";
 
-Server.PrintMessage.Connect(print);
-Server.Player.GetStatus.SetCallback(getPlayerStatus);
+Definitions.Server.PrintMessage.Connect(print);
+Definitions.Server.Player.GetStatus.SetCallback(getPlayerStatus);
 ```
 
 Alternatively, we can also send requests by directly calling a definition. The method used to call the definition will depend on its kind.
@@ -126,8 +127,8 @@ Alternatively, we can also send requests by directly calling a definition. The m
 - **AsyncFunction** -> `CallAsync`
 
 ```js
-Client.PrintMessage("Hello world!");
-Client.Player.GetStatus();
+Definitions.Client.PrintMessage("Hello world!");
+Definitions.Client.Player.GetStatus();
 ```
 
 Once the game starts, the remote instances are automatically generated in a folder named `NetBuilderRemotes`, located in `ReplicatedStorage`. A way to change the location of the instances will be explained later.
@@ -347,7 +348,7 @@ export = new NetBuilder()
 	.BindDefinition(
 		new DefinitionBuilder("Introduction")
 			.SetArguments(t.Person)
-			.SetReturn(t.RustResult)
+			.SetReturn(TypeCheck.RustResult)
 			.Build()
 	)
 	.Build();

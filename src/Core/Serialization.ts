@@ -65,7 +65,10 @@ namespace Serialization {
 
 	export function IsSerializer(value: defined): value is NetBuilderSerializer<defined> {
 		return (
-			type(value) === "table" && "Class" in value && "Serialize" in value && "Deserialize" in value
+			type(value) === "table" &&
+			"Class" in value &&
+			"Serialization" in value &&
+			"Deserialization" in value
 		);
 	}
 
