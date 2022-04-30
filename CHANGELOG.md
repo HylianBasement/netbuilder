@@ -6,6 +6,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+# [0.4.0] - 2022-04-30
+### Added
+- Added `RootName` field to configuration.
+- Added `SetRootName` method to `ConfigurationBuilder`.
+
+# [0.3.0] - 2022-04-29
+### Added
+- Added `Serialization.CreateSerializationDefinition`.
+- Added `SerializationDefinition`.
+
+### Changed
+- `SerializationCreator`'s methods (for serializers) now have a definition parameter, so that it can be used for manual serialization.
+- Exposed the `Serialization` namespace.
+- Exposed the `SerializedObject` type.
+
 ## [0.2.3] - 2022-04-28
 ### Changed
 - Removes a `print(obj)` call from a module. Yeah...

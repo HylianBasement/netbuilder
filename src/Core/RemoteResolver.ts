@@ -101,8 +101,11 @@ class RemoteResolver<F extends Callback> {
 		return folder;
 	}
 
-	private static unwrapRootInstance(root: NetBuilderConfiguration["RootInstance"]) {
-		const r = ReplicatedStorage.FindFirstChild(this.defaultRootName);
+	private static unwrapRootInstance(
+		definition: DefinitionMembers,
+		root: NetBuilderConfiguration["RootInstance"],
+	) {
+		const r = ReplicatedStorage.FindFirstChild(this.getDefaultRootName(definition));
 
 		return this.root !== undefined
 			? Option.some(this.root)
@@ -115,13 +118,19 @@ class RemoteResolver<F extends Callback> {
 			: Option.none<Instance>();
 	}
 
+	private static getDefaultRootName(definition: DefinitionMembers) {
+		const config = symbolDictionary(definition.Namespace)[Configuration] as NetBuilderConfiguration;
+
+		return config.RootName ?? this.defaultRootName;
+	}
+
 	// Server
 	public static For<F extends Callback>(definition: Definition, isSender: boolean) {
 		const def = definition as unknown as DefinitionMembers;
 		const config = symbolDictionary(def.Namespace)[Configuration] as NetBuilderConfiguration;
 
-		this.root = this.unwrapRootInstance(config.RootInstance).unwrapOrElse(() =>
-			this.createDirectory(this.defaultRootName, ReplicatedStorage),
+		this.root = this.unwrapRootInstance(def, config.RootInstance).unwrapOrElse(() =>
+			this.createDirectory(this.getDefaultRootName(def), ReplicatedStorage),
 		);
 
 		const { entries } = this;
@@ -174,6 +183,7 @@ class RemoteResolver<F extends Callback> {
 	public static Request<F extends Callback>(definition: DefinitionMembers) {
 		const root = (
 			this.unwrapRootInstance(
+				definition,
 				(symbolDictionary(definition.Namespace)[Configuration] as NetBuilderConfiguration)
 					.RootInstance,
 			) as Option<{ Name: string; Parent?: Instance }>

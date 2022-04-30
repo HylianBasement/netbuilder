@@ -1,4 +1,4 @@
-import { NetBuilder, DefinitionBuilder, RateLimiter } from "@rbxts/netbuilder";
+import { NetBuilder, DefinitionBuilder, RateLimiter, Serialization } from "@rbxts/netbuilder";
 import { t } from "@rbxts/t";
 
 import Person from "./Class/Person";
@@ -6,12 +6,10 @@ import Log from "./Util/Log";
 
 export = new NetBuilder()
 	.Configure((config) =>
-		config
-			.SetRoot((rs) => rs.WaitForChild("remotes"))
-			.SetLogger({
-				Error: (def, stderr) => Log.Error(`[${def.Id}] ${stderr}`),
-				Warn: (def, ...params) => Log.Warn(`[${def.Id}]`, ...params),
-			}),
+		config.SetRootName("ExampleRemotes").SetLogger({
+			Error: (def, stderr) => Log.Error(`[${def.Id}] ${stderr}`),
+			Warn: (def, ...params) => Log.Warn(`[${def.Id}]`, ...params),
+		}),
 	)
 	.BindDefinition(new DefinitionBuilder("PrintOnClient").SetArguments(t.string).Build())
 	.BindNamespace(

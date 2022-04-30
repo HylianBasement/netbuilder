@@ -10,6 +10,13 @@ class ConfigurationBuilder<O extends keyof ConfigurationBuilder = never> {
 		return this as unknown as Omit<ConfigurationBuilder<O | "SetLogger">, O | "SetLogger">;
 	}
 
+	/** Changes the root directory default name. */
+	public SetRootName(rootName: string) {
+		this.configuration.RootName = rootName;
+
+		return this as unknown as Omit<ConfigurationBuilder<O | "SetRootName">, O | "SetRootName">;
+	}
+
 	/** Sets the root instance of the remotes from the namespace. */
 	public SetRoot(root: Instance | ((replicatedStorage: ReplicatedStorage) => Instance)) {
 		this.configuration.RootInstance = root;

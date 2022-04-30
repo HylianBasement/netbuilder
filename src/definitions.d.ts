@@ -106,6 +106,7 @@ export interface NetBuilderLogger {
 }
 
 export interface NetBuilderConfiguration {
+	RootName?: string;
 	RootInstance?: Instance | ((replicatedStorage: ReplicatedStorage) => Instance);
 	SuppressWarnings?: boolean;
 	Logger?: NetBuilderLogger;
