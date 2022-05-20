@@ -6,10 +6,13 @@ import Log from "./Util/Log";
 
 export = new NetBuilder()
 	.Configure((config) =>
-		config.SetRootName("ExampleRemotes").SetLogger({
-			Error: (def, stderr) => Log.Error(`[${def.Id}] ${stderr}`),
-			Warn: (def, ...params) => Log.Warn(`[${def.Id}]`, ...params),
-		}),
+		config
+			.SetRootName("ExampleRemotes")
+			.SetLogger({
+				Error: (def, stderr) => Log.Error(`[${def.Id}] ${stderr}`),
+				Warn: (def, ...params) => Log.Warn(`[${def.Id}]`, ...params),
+			})
+			.CacheFunctions(),
 	)
 	.BindDefinition(new DefinitionBuilder("PrintOnClient").SetArguments(t.string).Build())
 	.BindNamespace(

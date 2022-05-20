@@ -11,9 +11,10 @@
 NetBuilder is a Roblox networking library, aiming to simplify network management using the [builder pattern](https://refactoring.guru/design-patterns/builder) for creating remote definitions. Gives you full control over input and output values.
 
 ## Features
-- Builder API for creating and configuring definitions/middlewares.
+- Builder API for creating and configuring definitions.
 - Namespaces for definitions, for better organization.
-- Automatic sort for generated remote trees. If a definition is not being used, it won't be generated.
+- Ability to change the namespaces behaviours - Configuration fields can be inherited from its parent namespace and can be overwritten.
+- Automatic sort for generated remote trees. By default, if a definition is not being used, it won't be generated.
 - Middlewares to have the ability to put your own custom behaviours to remotes. Middlewares have contextual, global and IO mapping support. There are [built-in middlewares](https://github.com/Rimuy/netbuilder/tree/main/src/Middleware) available for use.
 - Direct references to definitions for both client and server.
 - Supports promise return values (asynchronous functions) for both events and functions.
@@ -22,9 +23,9 @@ NetBuilder is a Roblox networking library, aiming to simplify network management
 - Ability to change the logger.
 
 ## Goals
-- An authentic, simple and intuitive API.
+- An authentic and straightforward API.
 - To make the overall networking development experience in Roblox less stressing.
-- Fully customizable definitions by being able to map what is sent and what is received. (Useful for things like serialization and encryption)
+- Fully customizable definitions by being able to map what is sent and what is received. (Useful for things like string/number manipulation and encryption)
 
 ## Non-goals
 - Support ClientFunctions ─ The server just shouldn't expect any output from a client at all. Giving a client access to edit whatever is requested from the server, makes your game very vulnerable to exploits due to it having *full control* on what is returned to the server.
@@ -135,9 +136,11 @@ Once the game starts, the remote instances are automatically generated in a fold
 
 ![Generated Remotes S1](assets/generated_remotes1.png)
 
-However, the library only generates remote instances from definitions that are actually being used, which means that in the case of the first example showed, it'll likely only generate two remote instances:
+However, the library only generates remote instances for definitions that are actually being used, which means that in the case of the first example showed, it'll likely only generate two remote instances:
 
 ![Generated Remotes S2](assets/generated_remotes2.png)
+
+This behaviour can be changed to generate remotes for every single definition, regardless of its use, by setting the `PreGeneration` configuration field to true.
 
 > Note: Client functions are not supported, therefore cannot be used and will throw an error if doing so.
 
@@ -145,20 +148,25 @@ However, the library only generates remote instances from definitions that are a
 Namespaces are configurable! With the `Configure` method, we're able to change how the library will behave for a specific namespace and its descendants. Any configuration applied to a descendant will overwrite the existing one.
 
 Current available fields for configuration are:
+- `RootName` - Changes the default name of the root directory.
 - `RootInstance` - Changes the location of the remote instances main directory.
-- `SupressWarnings` - Disables all the warnings emitted from the library.
+- `SuppressWarnings` - Disables all the warnings emitted from the library.
 - `Logger` - Changes the logger to all of the namespace's definitions.
+- `PreGeneration` - Generates remotes for all the registered definitions, regardless if they are being used or not.
+- `CacheFunctions` - If set to true, functions will always return their latest successful value instead of throwing an error when a middleware fails.
+- `Label` - Changes the warning/error messages text between brackets. e.g: `[netbuilder] Could not find remote instance.` -> `[newtext] Could not find remote instance.`
+- `Debug` - Activates debug mode.
 
 ```js
 new NetBuilder()
 	.Configure({
-		RootInstance: (rs) => rs.WaitForChild("MyRemotes"),
-		SupressWarnings: true,
+		RootName: "MyRemotes",
+		SuppressWarnings: true,
 	})
 	.BindNamespace("Foo",
 		new NetBuilder()
 			.Configure({
-				RootInstance: (rs) => rs.WaitForChild("FooRemotes"),
+				RootName: "FooRemotes",
 			})
 			// ...
 			.AsNamespace(),

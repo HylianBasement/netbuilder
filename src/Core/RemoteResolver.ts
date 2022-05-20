@@ -8,15 +8,16 @@ import {
 	DefinitionNamespace,
 } from "../definitions";
 
-import Configuration from "../Symbol/Configuration";
 import NamespaceId from "../Symbol/NamespaceId";
 import NamespaceParent from "../Symbol/NamespaceParent";
 
 import netBuilderWarn from "../Util/netBuilderWarn";
 import getRemoteInstanceKind from "../Util/getRemoteInstanceKind";
 import definitionInfo from "../Util/definitionInfo";
+import netBuilderDebug from "../Util/netBuilderDebug";
 import netBuilderError from "../Util/netBuilderError";
 import symbolDictionary from "../Util/symbolDictionary";
+import getConfiguration from "../Util/getConfiguration";
 import { Timeout } from "../Util/constants";
 
 interface TreeNode {
@@ -43,7 +44,19 @@ class RemoteResolver<F extends Callback> {
 
 	private constructor(private readonly remote: Remote<F>) {}
 
-	private static generate(parent: Instance, tree: ReadonlyArray<TreeNode>) {
+	private static generate(
+		parent: Instance,
+		tree: ReadonlyArray<TreeNode>,
+		definition: Definition,
+		isFirstCall = true,
+	) {
+		if (isFirstCall === true) {
+			netBuilderDebug(
+				definition,
+				`Generating instances from object tree for ${definitionInfo(definition)}.`,
+			);
+		}
+
 		const wasFound = Iterator.fromItems(...tree)
 			.findMap<Remote<Callback>>((node) =>
 				node.Remote.isSome() && parent.Name === node.Name ? node.Remote : Option.none(),
@@ -63,9 +76,10 @@ class RemoteResolver<F extends Callback> {
 
 			if (first) {
 				const dir =
-					parent.FindFirstChild(first.Name) ?? this.createDirectory(first.Name, parent);
+					parent.FindFirstChild(first.Name) ??
+					this.createDirectory(first.Name, parent, definition);
 
-				this.generate(dir as Folder, newTree);
+				this.generate(dir as Folder, newTree, definition, false);
 			}
 		}
 
@@ -90,47 +104,43 @@ class RemoteResolver<F extends Callback> {
 			return tree;
 		}
 
+		netBuilderDebug(definition, `Creating object tree for ${definitionInfo(definition)}.`);
+
 		return visitNamespaces([], (definition as unknown as DefinitionMembers).Namespace, true);
 	}
 
-	private static createDirectory(name: string, parent: Instance) {
+	private static createDirectory(name: string, parent: Instance, definition: Definition) {
 		const folder = new Instance("Folder");
 		folder.Parent = parent;
 		folder.Name = name;
 
+		netBuilderDebug(definition, `Created "${name}" directory.`);
+
 		return folder;
 	}
 
-	private static unwrapRootInstance(
-		definition: DefinitionMembers,
-		root: NetBuilderConfiguration["RootInstance"],
-	) {
-		const r = ReplicatedStorage.FindFirstChild(this.getDefaultRootName(definition));
-
-		return this.root !== undefined
-			? Option.some(this.root)
-			: r
-			? Option.some(r)
-			: typeIs(root, "function")
-			? Option.wrap(root(ReplicatedStorage))
-			: root
-			? Option.some(root)
-			: Option.none<Instance>();
+	private static findRootInstance(definition: DefinitionMembers) {
+		return Option.wrap(this.root)
+			.or(Option.wrap(ReplicatedStorage.FindFirstChild(this.getRootName(definition))))
+			.or(Option.wrap(this.getRootInstance(definition)));
 	}
 
-	private static getDefaultRootName(definition: DefinitionMembers) {
-		const config = symbolDictionary(definition.Namespace)[Configuration] as NetBuilderConfiguration;
+	private static getRootName(definition: DefinitionMembers) {
+		const config = getConfiguration(definition);
 
 		return config.RootName ?? this.defaultRootName;
+	}
+
+	private static getRootInstance(definition: DefinitionMembers) {
+		return getConfiguration(definition).RootInstance;
 	}
 
 	// Server
 	public static For<F extends Callback>(definition: Definition, isSender: boolean) {
 		const def = definition as unknown as DefinitionMembers;
-		const config = symbolDictionary(def.Namespace)[Configuration] as NetBuilderConfiguration;
 
-		this.root = this.unwrapRootInstance(def, config.RootInstance).unwrapOrElse(() =>
-			this.createDirectory(this.getDefaultRootName(def), ReplicatedStorage),
+		this.root = this.findRootInstance(def).unwrapOrElse(() =>
+			this.createDirectory(this.getRootName(def), ReplicatedStorage, definition),
 		);
 
 		const { entries } = this;
@@ -168,7 +178,7 @@ class RemoteResolver<F extends Callback> {
 				const Manager = new RemoteResolver(Remote);
 
 				entries.push({
-					Tree: this.generate(this.root, this.createTree(Remote, definition)),
+					Tree: this.generate(this.root, this.createTree(Remote, definition), definition),
 					Members: definition as unknown as DefinitionMembers,
 					IsSender: isSender,
 					Manager,
@@ -182,18 +192,17 @@ class RemoteResolver<F extends Callback> {
 	// Client
 	public static Request<F extends Callback>(definition: DefinitionMembers) {
 		const root = (
-			this.unwrapRootInstance(
-				definition,
-				(symbolDictionary(definition.Namespace)[Configuration] as NetBuilderConfiguration)
-					.RootInstance,
-			) as Option<{ Name: string; Parent?: Instance }>
-		).expect("An error occured while trying to unwrap the root directory.");
+			this.findRootInstance(definition) as Option<{
+				Name: string;
+				Parent?: Instance;
+			}>
+		).expect("Could not reference root directory.");
 
 		const parent = root.Parent!;
 
 		return Promise.retryWithDelay(
 			() =>
-				new Promise((res, rej) => {
+				Promise.defer((res, rej) => {
 					const remote = parent.WaitForChild(root.Name).FindFirstChild(definition.Id, true);
 
 					remote ? res(remote) : rej();

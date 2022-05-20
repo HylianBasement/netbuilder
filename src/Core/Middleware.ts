@@ -18,6 +18,7 @@ import definitionInfo from "../Util/definitionInfo";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import symbolDictionary from "../Util/symbolDictionary";
 import { IS_SERVER, Timeout } from "../Util/constants";
+import netBuilderDebug from "../Util/netBuilderDebug";
 
 interface FunctionState {
 	CurrentParameters: ReadonlyArray<unknown>;
@@ -43,7 +44,11 @@ namespace Middleware {
 		definition: DefinitionMembers,
 		callback: F,
 	): (...args: unknown[]) => NetBuilderResult<unknown> {
+		netBuilderDebug(definition, `Created a receiver for ${definitionInfo(definition, true)}.`);
+
 		return (...args: unknown[]) => {
+			netBuilderDebug(definition, `Executed ${definitionInfo(definition, true)}'s receiver.`);
+
 			const player = IS_SERVER ? (args as [Player]).shift()! : Players.LocalPlayer;
 			const state = resolveMiddlewares(player, {
 				Definition: definition,
@@ -109,6 +114,11 @@ namespace Middleware {
 		definition: DefinitionMembers,
 		...args: unknown[]
 	): SenderResult {
+		netBuilderDebug(
+			definition,
+			`Created and executed a sender for ${definitionInfo(definition, true)}.`,
+		);
+
 		const state = resolveMiddlewares(player, {
 			Definition: definition,
 			Kind: "Send",
@@ -166,7 +176,12 @@ namespace Middleware {
 	}
 
 	function resolveMiddlewares(player: Player, { Definition, Kind, Arguments }: DefinitionEntry) {
-		return getMiddlewares(Definition)
+		netBuilderDebug(
+			Definition,
+			`Started resolving all middlewares from ${definitionInfo(Definition, true)}.`,
+		);
+
+		const middlewares = getMiddlewares(Definition)
 			.tryFold(
 				identity<FunctionState>({
 					CurrentParameters: Arguments,
@@ -174,6 +189,14 @@ namespace Middleware {
 					Result: Result.ok([Arguments, (r: unknown) => r]),
 				}),
 				(state, middleware) => {
+					netBuilderDebug(
+						Definition,
+						`Resolving "${middleware.Id}" middleware for ${definitionInfo(
+							Definition,
+							true,
+						)}...`,
+					);
+
 					const result = createChannel(Definition, middleware[Kind])
 						.then(([fn, e]) => {
 							task.spawn(fn, player, ...state.CurrentParameters);
@@ -197,6 +220,13 @@ namespace Middleware {
 				},
 			)
 			.asPtr();
+
+		netBuilderDebug(
+			Definition,
+			`Finished resolving all middlewares from ${definitionInfo(Definition, true)}.`,
+		);
+
+		return middlewares;
 	}
 
 	function createChannel(definition: DefinitionMembers, channel: MiddlewareCallback<Callback>) {
@@ -211,6 +241,11 @@ namespace Middleware {
 			Promise.delay(Timeout.Middleware).andThenReturn(Middleware.timeoutMsg),
 		] as const)
 			.then(([ch, co, bindable, timeout]) => {
+				netBuilderDebug(
+					definition,
+					`Created a middleware resolving channel for ${definitionInfo(definition, true)}.`,
+				);
+
 				let isDone = false;
 
 				const close = (result: ThreadResult) => {

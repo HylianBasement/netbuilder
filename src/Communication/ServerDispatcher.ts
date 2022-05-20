@@ -3,6 +3,7 @@ import { OptionMut } from "@rbxts/rust-classes";
 import {
 	DefinitionMembers,
 	NetBuilderAsyncReturn,
+	NetBuilderConfiguration,
 	NetBuilderResult,
 	Remote,
 	ThreadResult,
@@ -15,10 +16,15 @@ import RemoteResolver from "../Core/RemoteResolver";
 import assertRemoteType from "../Util/assertRemoteType";
 import definitionInfo from "../Util/definitionInfo";
 import isRemoteFunction from "../Util/isRemoteFunction";
+import netBuilderDebug from "../Util/netBuilderDebug";
 import netBuilderError from "../Util/netBuilderError";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import promiseYield from "../Util/promiseYield";
 import { IS_RUNNING, IS_SERVER, Timeout } from "../Util/constants";
+
+import Configuration from "../Symbol/Configuration";
+
+type ParametersWithPlayer<F extends Callback> = [player: Player, ...params: Parameters<F>];
 
 const Players = game.GetService("Players");
 
@@ -37,13 +43,27 @@ class ServerDispatcher<F extends Callback> {
 		}
 
 		const timeout = definition.Timeout;
+		const config = definition.Namespace[
+			Configuration as never
+		] as unknown as NetBuilderConfiguration;
 
 		this.timeout = timeout;
 		this.warningTimeout = timeout / 2 >= Timeout.AsyncFunctionMin ? timeout / 2 : math.huge;
+
+		if (config.PreGeneration) {
+			this.getOrCreateRemote();
+		}
 	}
 
 	private getOrCreateRemote() {
-		return this.remote.getOrInsertWith(() => RemoteResolver.For<F>(this.definition as never, true));
+		return this.remote.getOrInsertWith(() => {
+			netBuilderDebug(
+				this.definition,
+				`Generating remote instance for ${definitionInfo(this.definition)}.`,
+			);
+
+			return RemoteResolver.For<F>(this.definition as never, true);
+		});
 	}
 
 	private resolvePlayerList(playerOrPlayers: Player | Player[]) {
@@ -64,6 +84,11 @@ class ServerDispatcher<F extends Callback> {
 		return `The result from ${definitionInfo(this.definition)} is still pending.`;
 	}
 
+	/**
+	 * Calls the client synchronously and returns a result object containing its status and value/error message.
+	 *
+	 *  Reserved for **internal use only**.
+	 */
 	private rawCall(player: Player, args: unknown[]): NetBuilderResult<UnwrapAsyncReturnType<F>> {
 		const remote = this.getOrCreateRemote();
 		const { definition } = this;
@@ -80,6 +105,11 @@ class ServerDispatcher<F extends Callback> {
 
 		return result.match(
 			([newArgs, resultFn]) => {
+				netBuilderDebug(
+					definition,
+					`Client${definitionInfo(definition)} was invoked for ${player.Name}.`,
+				);
+
 				const returnResult = remote.InvokeClient(
 					player,
 					...(newArgs as never),
@@ -124,32 +154,41 @@ class ServerDispatcher<F extends Callback> {
 	/** Fires a client event for a player or a specific group of clients. */
 	public Send(player: Player | Player[], ...args: Parameters<F>) {
 		const remote = this.getOrCreateRemote();
+		const { definition } = this;
 
-		if (!IS_RUNNING || !assertRemoteType(this.definition, "RemoteEvent", remote)) return;
+		if (!IS_RUNNING || !assertRemoteType(definition, "RemoteEvent", remote)) return;
 
 		for (const plr of this.resolvePlayerList(player)) {
-			const result = Middleware.CreateSender(plr, this.definition, ...(args as unknown[]));
+			const result = Middleware.CreateSender(plr, definition, ...(args as unknown[]));
 
 			if (result.isOk()) {
+				netBuilderDebug(
+					definition,
+					`Client${definitionInfo(definition)} was fired for ${plr.Name}.`,
+				);
+
 				return remote.FireClient(plr, ...(result.unwrap()[0] as never));
 			}
 
-			netBuilderError(this.definition, result.unwrapErr(), 3);
+			netBuilderError(definition, result.unwrapErr(), 3);
 		}
 	}
 
-	/** Fires all the clients. **(Does not use middlewares)** */
+	/** Fires all the clients. **(Does not resolve middlewares)** */
 	public SendToAll(...args: Parameters<F>) {
 		const remote = this.getOrCreateRemote();
+		const { definition } = this;
 
-		if (!IS_RUNNING || !assertRemoteType(this.definition, "RemoteEvent", remote)) return;
+		if (!IS_RUNNING || !assertRemoteType(definition, "RemoteEvent", remote)) return;
+
+		netBuilderDebug(definition, `Client${definitionInfo(definition)} was fired for all players.`);
 
 		remote.FireAllClients(...(args as never));
 	}
 
 	/** Fires all the clients, except for a selected one or a specific group. */
 	public SendWithout(player: Player | Player[], ...args: Parameters<F>) {
-		if (!!IS_RUNNING || !assertRemoteType(this.definition, "RemoteEvent", this.getOrCreateRemote()))
+		if (IS_RUNNING || !assertRemoteType(this.definition, "RemoteEvent", this.getOrCreateRemote()))
 			return;
 
 		const players = new Set(this.resolvePlayerList(player));
@@ -162,13 +201,35 @@ class ServerDispatcher<F extends Callback> {
 
 	/** Connects a listener callback that is called whenever new data is received from a client. */
 	public Connect(callback: (player: Player, ...args: Parameters<F>) => void | Promise<void>) {
+		const { definition } = this;
 		const remote = this.getOrCreateRemote();
 
 		if (isRemoteFunction(remote)) {
-			netBuilderError(this.definition, "Expected ServerEvent, got Function.", 3);
+			netBuilderError(definition, "Expected ServerEvent, got Function.", 3);
 		}
 
-		remote.OnServerEvent.Connect(Middleware.CreateReceiver(this.definition, callback) as never);
+		netBuilderDebug(definition, `Created a new connection for ${definitionInfo(definition, true)}.`);
+
+		return remote.OnServerEvent.Connect(Middleware.CreateReceiver(definition, callback) as never);
+	}
+
+	/** Yields the current thread until the a request is sent. Returns what was fired to the signal. */
+	public Wait() {
+		const remote = this.getOrCreateRemote();
+		const { definition } = this;
+
+		if (isRemoteFunction(remote)) {
+			netBuilderError(definition, "Expected ServerEvent, got Function.", 3);
+		}
+
+		netBuilderDebug(definition, `Created a waiter for ${definitionInfo(definition, true)}.`);
+
+		return new Promise<ParametersWithPlayer<F>>((res) =>
+			task.spawn(
+				(connection) => connection.Disconnect(),
+				this.Connect((...args) => res(args)),
+			),
+		).expect() as LuaTuple<ParametersWithPlayer<F>>;
 	}
 
 	/** Connects a callback that returns back asynchronous only data to the server. */
@@ -178,11 +239,14 @@ class ServerDispatcher<F extends Callback> {
 			...args: Parameters<F>
 		) => ReturnType<F> extends Promise<any> ? ReturnType<F> : ReturnType<F> | Promise<ReturnType<F>>,
 	) {
+		const { definition } = this;
 		const remote = this.getOrCreateRemote();
 
 		if (!isRemoteFunction(remote)) {
 			netBuilderError(this.definition, "Expected ServerFunction, got ServerEvent.", 3);
 		}
+
+		netBuilderDebug(definition, `A callback was set for ${definitionInfo(definition, true)}.`);
 
 		remote.OnServerInvoke = Middleware.CreateReceiver(this.definition, callback);
 	}

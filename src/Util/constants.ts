@@ -1,4 +1,14 @@
+import { NetBuilderConfiguration } from "../definitions";
+
 const RunService = game.GetService("RunService");
+
+export const DEFAULT_CONFIGURATION: NetBuilderConfiguration = {
+	Label: "netbuilder",
+	Debug: false,
+	SuppressWarnings: false,
+	PreGeneration: false,
+	CacheFunctions: false,
+};
 
 export const IS_RUNNING = RunService.IsRunning();
 

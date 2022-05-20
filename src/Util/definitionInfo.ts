@@ -1,3 +1,7 @@
-import { DefinitionMembers } from "../definitions";
+import { Definition, DefinitionMembers } from "../definitions";
+import { IS_SERVER } from "./constants";
 
-export = (definition: DefinitionMembers) => `${definition.Kind}<${definition.Id}>`;
+export = (definition: Definition | DefinitionMembers, includeBoundary = false) =>
+	`${includeBoundary ? (IS_SERVER ? "Server" : "Client") : ""}${
+		(definition as DefinitionMembers).Kind
+	}<${(definition as DefinitionMembers).Id}>`;

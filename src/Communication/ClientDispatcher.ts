@@ -13,9 +13,11 @@ import RemoteResolver from "../Core/RemoteResolver";
 import assertRemoteType from "../Util/assertRemoteType";
 import definitionInfo from "../Util/definitionInfo";
 import isRemoteFunction from "../Util/isRemoteFunction";
+import netBuilderDebug from "../Util/netBuilderDebug";
 import netBuilderError from "../Util/netBuilderError";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import promiseYield from "../Util/promiseYield";
+import getConfiguration from "../Util/getConfiguration";
 import { IS_CLIENT, Timeout } from "../Util/constants";
 
 const player = game.GetService("Players").LocalPlayer;
@@ -24,6 +26,10 @@ const player = game.GetService("Players").LocalPlayer;
  */
 class ClientDispatcher<F extends Callback> {
 	private remote: Remote<F> | undefined;
+
+	private cache: boolean;
+
+	private cachedValue: unknown;
 
 	private timeout: number;
 
@@ -38,6 +44,7 @@ class ClientDispatcher<F extends Callback> {
 
 		this.timeout = timeout;
 		this.warningTimeout = timeout / 2 >= Timeout.AsyncFunctionMin ? timeout / 2 : math.huge;
+		this.cache = getConfiguration(definition).CacheFunctions;
 	}
 
 	private tryFindRemote() {
@@ -61,7 +68,9 @@ class ClientDispatcher<F extends Callback> {
 		const result = this.RawCall(...(args as never));
 
 		if (result.Type === "Ok") {
-			return result.Data;
+			return (this.cachedValue = result.Data);
+		} else if (this.cache) {
+			return this.cachedValue;
 		}
 
 		netBuilderError(this.definition, result.Message, 3);
@@ -116,6 +125,8 @@ class ClientDispatcher<F extends Callback> {
 
 		return result.match(
 			([newArgs, resultFn]) => {
+				netBuilderDebug(definition, `Server${definitionInfo(definition)} was invoked.`);
+
 				const returnResult = remote.InvokeServer(...(newArgs as never)) as NetBuilderResult<
 					ReturnType<F>
 				>;
@@ -139,33 +150,65 @@ class ClientDispatcher<F extends Callback> {
 	/** Sends a request to the server with the given arguments. */
 	public Send(...args: Parameters<F>) {
 		const remote = this.tryFindRemote();
+		const { definition } = this;
 
-		if (!assertRemoteType(this.definition, "RemoteEvent", remote)) return;
+		if (!assertRemoteType(definition, "RemoteEvent", remote)) return;
 
-		const result = Middleware.CreateSender(player, this.definition, ...(args as unknown[]));
+		const result = Middleware.CreateSender(player, definition, ...(args as unknown[]));
 
 		if (result.isOk()) {
+			netBuilderDebug(definition, `Server${definitionInfo(definition)} was fired.`);
+
 			return remote.FireServer(...(result.unwrap()[0] as never));
 		}
 
-		netBuilderWarn(this.definition, result.unwrapErr());
+		netBuilderWarn(definition, result.unwrapErr());
 	}
 
 	/** Connects a listener callback that is called whenever new data is received from the server. */
 	public Connect(callback: (...args: Parameters<F>) => void | Promise<void>) {
-		if (this.definition.Kind === "Function") {
-			netBuilderError(this.definition, "Client functions are not supported!", 3);
+		const { definition } = this;
+
+		if (definition.Kind === "Function") {
+			netBuilderError(definition, "Client functions are not supported!", 3);
 		}
 
 		const remote = this.tryFindRemote();
 
-		if (!remote) return;
-
-		if (isRemoteFunction(remote)) {
-			netBuilderError(this.definition, "Expected ClientEvent, got ClientFunction.", 3);
+		if (!remote) {
+			netBuilderError(definition, "Could not find the remote instance.", 3);
 		}
 
-		remote.OnClientEvent.Connect(Middleware.CreateReceiver(this.definition, callback) as F);
+		if (isRemoteFunction(remote)) {
+			netBuilderError(definition, "Expected ClientEvent, got ClientFunction.", 3);
+		}
+
+		netBuilderDebug(definition, `Created a new connection for ${definitionInfo(definition, true)}.`);
+
+		return remote.OnClientEvent.Connect(Middleware.CreateReceiver(definition, callback) as F);
+	}
+
+	/** Yields the current thread until the a request is sent. Returns what was fired to the signal. */
+	public Wait() {
+		const remote = this.tryFindRemote();
+		const { definition } = this;
+
+		if (!remote) {
+			netBuilderError(definition, "Could not find the remote instance.", 3);
+		}
+
+		if (isRemoteFunction(remote)) {
+			netBuilderError(definition, "Expected ClientEvent, got ClientFunction.", 3);
+		}
+
+		netBuilderDebug(definition, `Created a waiter for ${definitionInfo(definition, true)}.`);
+
+		return new Promise<Parameters<F>>((res) =>
+			task.spawn(
+				(connection) => connection.Disconnect(),
+				this.Connect((...args) => res(args)),
+			),
+		).expect() as LuaTuple<Parameters<F>>;
 	}
 
 	/** Connects a callback that returns back data to the client. */
@@ -176,16 +219,21 @@ class ClientDispatcher<F extends Callback> {
 		) => ReturnType<F> extends Promise<any> ? ReturnType<F> : ReturnType<F> | Promise<ReturnType<F>>,
 	) {
 		const remote = this.tryFindRemote();
+		const { definition } = this;
 
-		if (!remote) return;
-
-		if (this.definition.Kind === "Function") {
-			netBuilderError(this.definition, "Client functions are not supported!", 3);
-		} else if (!isRemoteFunction(remote)) {
-			netBuilderError(this.definition, "Expected ClientAsyncFunction, got ClientEvent.", 3);
+		if (!remote) {
+			netBuilderError(definition, "Could not find the remote instance.", 3);
 		}
 
-		remote.OnClientInvoke = Middleware.CreateReceiver(this.definition, callback) as F;
+		if (definition.Kind === "Function") {
+			netBuilderError(definition, "Client functions are not supported!", 3);
+		} else if (!isRemoteFunction(remote)) {
+			netBuilderError(definition, "Expected ClientAsyncFunction, got ClientEvent.", 3);
+		}
+
+		netBuilderDebug(definition, `A callback was set for ${definitionInfo(definition, true)}.`);
+
+		remote.OnClientInvoke = Middleware.CreateReceiver(definition, callback) as F;
 	}
 }
 

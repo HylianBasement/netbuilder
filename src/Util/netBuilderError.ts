@@ -1,22 +1,15 @@
-import {
-	Definition,
-	DefinitionMembers,
-	LoggingDefinition,
-	NetBuilderConfiguration,
-} from "../definitions";
+import { Definition, DefinitionMembers, LoggingDefinition } from "../definitions";
 
-import symbolDictionary from "./symbolDictionary";
+import getConfiguration from "./getConfiguration";
 
-import Configuration from "../Symbol/Configuration";
+import { DEFAULT_CONFIGURATION } from "./constants";
 
 function netBuilderError(
 	definition: Definition | DefinitionMembers,
 	message?: unknown,
 	level?: number,
 ): never {
-	const { Logger } = symbolDictionary((definition as DefinitionMembers).Namespace)[
-		Configuration
-	] as NetBuilderConfiguration;
+	const { Logger } = getConfiguration(definition);
 
 	const loggingDefinition: LoggingDefinition = {
 		Id: (definition as DefinitionMembers).Id,
@@ -26,7 +19,7 @@ function netBuilderError(
 	table.freeze(loggingDefinition);
 
 	Logger?.Error?.(loggingDefinition, message);
-	error(`[netbuilder] ${message}`, level);
+	error(`[${DEFAULT_CONFIGURATION.Label}] ${message}`, level);
 }
 
 export = netBuilderError;

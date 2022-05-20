@@ -1,19 +1,10 @@
-import {
-	Definition,
-	DefinitionMembers,
-	LoggingDefinition,
-	NetBuilderConfiguration,
-} from "../definitions";
-
-import Configuration from "../Symbol/Configuration";
+import { Definition, DefinitionMembers, LoggingDefinition } from "../definitions";
 
 import netBuilderFormat from "./netBuilderFormat";
-import symbolDictionary from "./symbolDictionary";
+import getConfiguration from "./getConfiguration";
 
 export = (definition: Definition | DefinitionMembers, ...params: unknown[]) => {
-	const { SuppressWarnings, Logger } = symbolDictionary((definition as DefinitionMembers).Namespace)[
-		Configuration
-	] as NetBuilderConfiguration;
+	const { SuppressWarnings, Logger } = getConfiguration(definition);
 
 	const loggingDefinition: LoggingDefinition = {
 		Id: (definition as DefinitionMembers).Id,

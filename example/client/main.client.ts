@@ -1,9 +1,8 @@
 import Definitions from "shared/Definitions";
 import Person from "shared/Class/Person";
 
-Definitions.Client.PrintOnClient.Connect((message) => {
-	print("Server says: " + message);
-});
+const [message] = Definitions.Client.PrintOnClient.Wait();
+print("Server says: " + message);
 
 const john = new Person("John Doe", 6);
 

@@ -4,7 +4,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## Unreleased
+# [0.5.0] - 2022-05-20
+### Added
+- Added `PreGeneration` configuration field.
+- Added `CacheFunctions` configuration field.
+- Added `Label` configuration field.
+- Added `Debug` configuration field.
+- Added a `Wait` method for both dispatchers.
+
+### Changed
+- **[breaking]** Changed `SupressWarnings` method in `ConfigurationBuilder` to `SuppressWarnings`. (typo fix)
+- **[breaking]** Changed `SetRoot` method in `ConfigurationBuilder` to `SetRootInstance`.
+- **[breaking]** Changed RootInstance option to only accept a Instance.
+- The `Connect` method on both dispatchers now returns its `RBXScriptConnection`.
+- `ClientDispatcher` will now throw an error if the remote instance could not be found.
+
+### Removed
+- Removed deprecated configuration methods from `NetBuilder`.
+
 
 # [0.4.0] - 2022-04-30
 ### Added

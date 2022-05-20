@@ -100,16 +100,26 @@ export interface NetBuilderAsyncReturn<T> extends Promise<T> {
 	): Promise<T | TResult>;
 }
 
+export type NetBuilderLoggerCallback<P extends Array<any>> = (
+	definition: LoggingDefinition,
+	...params: P
+) => void;
+
 export interface NetBuilderLogger {
-	Error?: (definition: LoggingDefinition, stderr: unknown) => void;
-	Warn?: (definition: LoggingDefinition, ...params: unknown[]) => void;
+	Debug?: NetBuilderLoggerCallback<Array<unknown>>;
+	Error?: NetBuilderLoggerCallback<[stderr: unknown]>;
+	Warn?: NetBuilderLoggerCallback<Array<unknown>>;
 }
 
 export interface NetBuilderConfiguration {
 	RootName?: string;
-	RootInstance?: Instance | ((replicatedStorage: ReplicatedStorage) => Instance);
-	SuppressWarnings?: boolean;
+	RootInstance?: Instance;
 	Logger?: NetBuilderLogger;
+	Label: string;
+	Debug: boolean;
+	SuppressWarnings: boolean;
+	PreGeneration: boolean;
+	CacheFunctions: boolean;
 }
 
 /** Middleware entry type. */
@@ -181,11 +191,11 @@ export type ClientDefinition<K extends DefinitionKind, D> = D extends ClientDisp
 		: K extends "Function"
 		? { (this: void, ...args: Parameters<D["Call"]>): ReturnType<D["Call"]> } & Omit<
 				D,
-				"Connect" | "CallAsync" | "Send"
+				"Connect" | "Wait" | "CallAsync" | "Send"
 		  >
 		: { (this: void, ...args: Parameters<D["CallAsync"]>): ReturnType<D["CallAsync"]> } & Omit<
 				D,
-				"Connect" | "Call" | "RawCall" | "CallWith" | "Send"
+				"Connect" | "Wait" | "Call" | "RawCall" | "CallWith" | "Send"
 		  >
 	: never;
 
@@ -193,10 +203,10 @@ export type ServerDefinition<K extends DefinitionKind, D> = D extends ServerDisp
 	? K extends "Event"
 		? { (this: void, ...args: Parameters<D["Send"]>): void } & Omit<D, "SetCallback" | "CallAsync">
 		: K extends "Function"
-		? Omit<D, "Connect" | "CallAsync" | "Send" | "SendToAll" | "SendWithout">
+		? Omit<D, "Connect" | "Wait" | "CallAsync" | "Send" | "SendToAll" | "SendWithout">
 		: { (this: void, ...args: Parameters<D["CallAsync"]>): ReturnType<D["CallAsync"]> } & Omit<
 				D,
-				"Connect" | "Send" | "SendToAll" | "SendWithout"
+				"Connect" | "Wait" | "Send" | "SendToAll" | "SendWithout"
 		  >
 	: never;
 

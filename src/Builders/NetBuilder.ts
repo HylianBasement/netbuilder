@@ -36,7 +36,7 @@ import Serializers from "../Symbol/Serializers";
 import SerializationMap from "../Symbol/SerializationMap";
 
 import symbolDictionary from "../Util/symbolDictionary";
-import { IS_CLIENT, IS_SERVER } from "../Util/constants";
+import { DEFAULT_CONFIGURATION, IS_CLIENT, IS_SERVER } from "../Util/constants";
 
 const enum Boundary {
 	Server,
@@ -97,7 +97,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 
 	private namespaces = new Array<{ name: string; space: DefinitionNamespace }>();
 
-	private configuration: NetBuilderConfiguration = { SuppressWarnings: false };
+	private configuration = DEFAULT_CONFIGURATION;
 
 	private serializableClasses = new Array<SerializableClass>();
 
@@ -230,30 +230,14 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 		return this as unknown as NetBuilder<Reconstruct<R & { readonly [_ in S]: N }>, O>;
 	}
 
-	public Configure(config: ((builder: ConfigurationBuilder) => object) | NetBuilderConfiguration) {
+	public Configure(
+		config: ((builder: ConfigurationBuilder) => object) | Partial<NetBuilderConfiguration>,
+	) {
 		this.configuration = typeIs(config, "function")
 			? (config(new ConfigurationBuilder()) as ConfigurationBuilder)["Build"]()
 			: { ...this.configuration, ...config };
 
 		return this as unknown as NetBuilder<R, O>;
-	}
-
-	/** Sets the root instance of the remotes from the namespace.
-	 * @deprecated
-	 */
-	public SetRoot(instance: Instance | ((replicatedStorage: ReplicatedStorage) => Instance)) {
-		this.configuration.RootInstance = instance;
-
-		return this as unknown as Omit<NetBuilder<R, O | "SetRoot">, O | "SetRoot">;
-	}
-
-	/** Disables the warnings emitted from the namespace.
-	 * @deprecated
-	 */
-	public SupressWarnings(value = true) {
-		this.configuration.SuppressWarnings = value;
-
-		return this as unknown as Omit<NetBuilder<R, O | "SupressWarnings">, O | "SupressWarnings">;
 	}
 
 	/** Sets a list of middlewares valid for every descendant definition. */
