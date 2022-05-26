@@ -28,7 +28,7 @@ NetBuilder is a Roblox networking library, aiming to simplify network management
 - Fully customizable definitions by being able to map what is sent and what is received. (Useful for things like string/number manipulation and encryption)
 
 ## Non-goals
-- Support ClientFunctions ─ The server just shouldn't expect any output from a client at all. Giving a client access to edit whatever is requested from the server, makes your game very vulnerable to exploits due to it having *full control* on what is returned to the server.
+- Support ClientFunctions ─ The server just shouldn't expect any output from a client at all. Giving a client access to edit whatever is requested from the server, makes your game very vulnerable to exploits due to it having *full control* over what is returned to the server.
 It is considered an anti-pattern and should be avoided.
 A full and elaborated explanation about that can be found [here](https://www.youtube.com/watch?v=0H_xcA-0LDE).
 
@@ -154,7 +154,7 @@ Current available fields for configuration are:
 - `Logger` - Changes the logger to all of the namespace's definitions.
 - `PreGeneration` - Generates remotes for all the registered definitions, regardless if they are being used or not.
 - `CacheFunctions` - If set to true, functions will always return their latest successful value instead of throwing an error when a middleware fails.
-- `Label` - Changes the warning/error messages text between brackets. e.g: `[netbuilder] Could not find remote instance.` -> `[newtext] Could not find remote instance.`
+- `Label` - Changes the warning/error messages text between brackets. e.g: "[netbuilder] Could not find remote instance." **->** "[newtext] Could not find remote instance."
 - `Debug` - Activates debug mode.
 
 ```js
@@ -188,7 +188,7 @@ new NetBuilder()
 		new DefinitionBuilder("Print")
 			.SetArguments(t.string)
 			.UseMiddleware([
-				RateLimiter({ MaxPerMinute: 10 }),
+				RateLimiter({ Max: 10 }),
 				Tracer((executor) => print(`Hello, ${executor.Name}!`)),
 			])
 			.Build()
@@ -201,7 +201,7 @@ Now this is what it looks when we're using them globally. `UseGlobalMiddleware` 
 ```js
 new NetBuilder()
 	.UseGlobalMiddleware([
-		RateLimiter({ MaxPerMinute: 15 }),
+		RateLimiter({ Max: 15 }),
 		Tracer((executor, definition, ...args) =>
 			print(
 				`[${definition.Id}]`,
@@ -212,7 +212,7 @@ new NetBuilder()
 	.BindDefinition(
 		new DefinitionBuilder("Print")
 			.SetArguments(t.string)
-			.UseMiddleware([RateLimiter({ MaxPerMinute: 5 })])
+			.UseMiddleware([RateLimiter({ Max: 5 })])
 			.Build()
 	)
 	.BindDefinition(
@@ -309,7 +309,7 @@ class Person implements Serializable<Props> {
 ### Creating serializers for existing classes
 However, you may also want to register an existing class to send their instances over remotes. Since this can't be done using the implementation method, we can use `NetBuilder.CreateSerializer`, a static method for creating *serializers* for objects.
 
-The code below shows exactly how to do that, using our good old `Result` class from [rust-classes](https://github.com/Dionysusnu/rbxts-rust-classes).
+The code below shows exactly how to do that, using our good ol' `Result` class from [rust-classes](https://github.com/Dionysusnu/rbxts-rust-classes).
 
 ```ts
 type SResult = { Type: "Ok"; Value: defined } | { Type: "Err"; Error: defined };
@@ -355,7 +355,7 @@ export = new NetBuilder()
 	.UseSerialization([Person, RustResult])
 	.BindDefinition(
 		new DefinitionBuilder("Introduction")
-			.SetArguments(t.Person)
+			.SetArguments(TypeCheck.Person)
 			.SetReturn(TypeCheck.RustResult)
 			.Build()
 	)
