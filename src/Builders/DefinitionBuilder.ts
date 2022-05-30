@@ -2,7 +2,7 @@ import {
 	NetBuilderMiddleware,
 	Definition,
 	DefinitionKind,
-	InferStrictArguments,
+	InferArguments,
 	Check,
 	Static,
 } from "../definitions";
@@ -49,12 +49,7 @@ class DefinitionBuilder<
 		this.parameterChecks = checks;
 
 		return this as unknown as Omit<
-			DefinitionBuilder<
-				I,
-				(...args: InferStrictArguments<T>) => ReturnType<D>,
-				K,
-				O | "SetArguments"
-			>,
+			DefinitionBuilder<I, (...args: InferArguments<T>) => ReturnType<D>, K, O | "SetArguments">,
 			O | "SetArguments"
 		>;
 	}

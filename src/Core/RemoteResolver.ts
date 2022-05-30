@@ -42,29 +42,19 @@ class RemoteResolver<F extends Callback> {
 
 	private static root: Instance;
 
-	private constructor(private readonly remote: Remote<F>) {}
+	private constructor(private readonly remote: Remote<F>, definition: Definition) {
+		netBuilderDebug(definition, `Created a RemoteResolver for ${definitionInfo(definition)}.`);
+	}
 
-	private static generate(
-		parent: Instance,
-		tree: ReadonlyArray<TreeNode>,
-		definition: Definition,
-		isFirstCall = true,
-	) {
-		if (isFirstCall === true) {
-			netBuilderDebug(
-				definition,
-				`Generating instances from object tree for ${definitionInfo(definition)}.`,
-			);
-		}
-
+	private static generate(parent: Instance, tree: ReadonlyArray<TreeNode>, definition: Definition) {
 		const wasFound = Iterator.fromItems(...tree)
 			.findMap<Remote<Callback>>((node) =>
 				node.Remote.isSome() && parent.Name === node.Name ? node.Remote : Option.none(),
 			)
-			.andWith((remote) => {
+			.map((remote) => {
 				remote.Parent = parent;
 
-				return Option.some(true);
+				return true;
 			})
 			.unwrapOr(false);
 
@@ -79,7 +69,7 @@ class RemoteResolver<F extends Callback> {
 					parent.FindFirstChild(first.Name) ??
 					this.createDirectory(first.Name, parent, definition);
 
-				this.generate(dir as Folder, newTree, definition, false);
+				this.generate(dir as Folder, newTree, definition);
 			}
 		}
 
@@ -104,7 +94,7 @@ class RemoteResolver<F extends Callback> {
 			return tree;
 		}
 
-		netBuilderDebug(definition, `Creating object tree for ${definitionInfo(definition)}.`);
+		netBuilderDebug(definition, `Making object tree for ${definitionInfo(definition)}.`);
 
 		return visitNamespaces([], (definition as unknown as DefinitionMembers).Namespace, true);
 	}
@@ -148,7 +138,7 @@ class RemoteResolver<F extends Callback> {
 
 		return Iterator.fromItems(...entries)
 			.find(({ Members, IsSender }) => Members.Id === Id && IsSender === isSender)
-			.andWith(({ Members, Manager, Tree }) => {
+			.map(({ Members, Manager, Tree }) => {
 				if ((Members as unknown as Definition) === definition) {
 					netBuilderError(
 						definition,
@@ -165,24 +155,33 @@ class RemoteResolver<F extends Callback> {
 						)}.\n\nPath: ${[
 							...Tree.map(({ Name }) => Name),
 							Tree[0].Remote ? definitionInfo(def) : Id,
-						].join(" -> ")}`,
+						].join(" ⇒ ")}`,
 					);
 				}
 
-				return Option.some(Manager);
+				return Manager;
 			})
 			.unwrapOrElse(() => {
-				const Remote = new Instance(getRemoteInstanceKind(Kind)) as Remote<F>;
-				Remote.Name = Id;
+				const instanceKind = getRemoteInstanceKind(Kind);
 
-				const Manager = new RemoteResolver(Remote);
+				const remote = new Instance(instanceKind) as Remote<F>;
+				remote.Name = Id;
+
+				netBuilderDebug(definition, `Created a ${instanceKind} for "${Id}".`);
+
+				const Manager = new RemoteResolver(remote, definition);
 
 				entries.push({
-					Tree: this.generate(this.root, this.createTree(Remote, definition), definition),
+					Tree: this.generate(this.root, this.createTree(remote, definition), definition),
 					Members: definition as unknown as DefinitionMembers,
 					IsSender: isSender,
 					Manager,
 				});
+
+				netBuilderDebug(
+					definition,
+					`Generating instances from object tree for ${definitionInfo(definition)}.`,
+				);
 
 				return Manager;
 			})
@@ -190,15 +189,11 @@ class RemoteResolver<F extends Callback> {
 	}
 
 	// Client
-	public static Request<F extends Callback>(definition: DefinitionMembers) {
-		const root = (
-			this.findRootInstance(definition) as Option<{
-				Name: string;
-				Parent?: Instance;
-			}>
-		).expect("Could not reference root directory.");
-
-		const parent = root.Parent!;
+	public static Find<F extends Callback>(definition: DefinitionMembers) {
+		const root = this.findRootInstance(definition).expect("Could not reference root directory.");
+		const parent = Option.wrap(root.Parent).expect(
+			"Root directory must contain a parent within the DataModel.",
+		);
 
 		return Promise.retryWithDelay(
 			() =>
@@ -208,7 +203,7 @@ class RemoteResolver<F extends Callback> {
 					remote ? res(remote) : rej();
 				}),
 			math.huge,
-			math.pi / 100,
+			task.wait(),
 		)
 			.timeout(Timeout.Remote)
 			.catch(() =>

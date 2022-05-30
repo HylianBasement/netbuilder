@@ -21,6 +21,7 @@ class Person implements Serializable<Props> {
 		return `Person<${this.name}>`;
 	}
 
+	/** @hidden */
 	public Serialize() {
 		return {
 			name: this.name,

@@ -1,5 +1,6 @@
 import { Definition, DefinitionMembers, LoggingDefinition } from "../definitions";
 
+import createLoggingDefinition from "./createLoggingDefinition";
 import getConfiguration from "./getConfiguration";
 
 import { DEFAULT_CONFIGURATION } from "./constants";
@@ -11,14 +12,7 @@ function netBuilderError(
 ): never {
 	const { Logger } = getConfiguration(definition);
 
-	const loggingDefinition: LoggingDefinition = {
-		Id: (definition as DefinitionMembers).Id,
-		Kind: (definition as DefinitionMembers).Kind,
-	};
-
-	table.freeze(loggingDefinition);
-
-	Logger?.Error?.(loggingDefinition, message);
+	Logger?.Error?.(createLoggingDefinition(definition), message);
 	error(`[${DEFAULT_CONFIGURATION.Label}] ${message}`, level);
 }
 

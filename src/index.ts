@@ -7,6 +7,7 @@ import Tracer from "./Middleware/Tracer";
 import Serialization from "./Core/Serialization";
 
 export type {
+	Check,
 	Serializable,
 	MiddlewareCallback,
 	NetBuilderResult,

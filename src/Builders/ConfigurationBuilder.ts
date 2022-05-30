@@ -1,4 +1,4 @@
-import { NetBuilderLogger } from "../definitions";
+import { NetBuilderConfiguration, NetBuilderLogger } from "../definitions";
 import { DEFAULT_CONFIGURATION } from "../Util/constants";
 
 class ConfigurationBuilder<O extends keyof ConfigurationBuilder = never> {
@@ -52,7 +52,7 @@ class ConfigurationBuilder<O extends keyof ConfigurationBuilder = never> {
 		>;
 	}
 
-	/** If set to true, functions will always return their latest successful value instead of throwing an error when a middleware fails. */
+	/** If set to true, functions called via `Call` will always return their latest successful value instead of throwing an error when a middleware fails. */
 	public CacheFunctions(value = true) {
 		this.configuration.CacheFunctions = value;
 
@@ -76,8 +76,8 @@ class ConfigurationBuilder<O extends keyof ConfigurationBuilder = never> {
 		return this as unknown as Omit<ConfigurationBuilder<O | "Debug">, O | "Debug">;
 	}
 
-	private Build() {
-		return this.configuration;
+	private Build(): NetBuilderConfiguration {
+		return { ...this.configuration };
 	}
 }
 

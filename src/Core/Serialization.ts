@@ -101,15 +101,11 @@ namespace Serialization {
 	export function CreateSerializationDefinition(
 		definition: DefinitionMembers,
 	): SerializationDefinition {
-		const serializationDefinition = {
+		return table.freeze({
 			Id: definition.Id,
 			Kind: definition.Kind,
 			Namespace: definition.Namespace,
-		};
-
-		table.freeze(serializationDefinition);
-
-		return serializationDefinition;
+		});
 	}
 
 	/** Checks if the class is registered in the definition's namespace. */

@@ -32,25 +32,25 @@ interface DefinitionEntry {
 	Arguments: Array<unknown>;
 }
 
-type SenderResult = Result<[unknown[], (r: unknown) => unknown], string>;
+type TransmitterResult = Result<[unknown[], (r: unknown) => unknown], string>;
 
 const Players = game.GetService("Players");
 
 /** @internal */
 namespace Middleware {
-	export const timeoutMsg = `middleware processing has timed out. (${Timeout.Middleware}s)`;
+	export const timeoutMsg = `Middleware processing has timed out. (${Timeout.Middleware}s)`;
 
-	export function CreateReceiver<F extends Callback>(
+	export function CreateChannel<F extends Callback>(
 		definition: DefinitionMembers,
 		callback: F,
 	): (...args: unknown[]) => NetBuilderResult<unknown> {
-		netBuilderDebug(definition, `Created a receiver for ${definitionInfo(definition, true)}.`);
+		netBuilderDebug(definition, `Created a channel for ${definitionInfo(definition, true)}.`);
 
 		return (...args: unknown[]) => {
-			netBuilderDebug(definition, `Executed ${definitionInfo(definition, true)}'s receiver.`);
+			netBuilderDebug(definition, `Executed ${definitionInfo(definition, true)}'s channel.`);
 
 			const player = IS_SERVER ? (args as [Player]).shift()! : Players.LocalPlayer;
-			const state = resolveMiddlewares(player, {
+			const state = processMiddlewares(player, {
 				Definition: definition,
 				Kind: "Recv",
 				Arguments: args,
@@ -76,6 +76,7 @@ namespace Middleware {
 					);
 
 					return TypeChecking.Parameters(newArgs, parameterChecks, true)
+						.map(() => executeFn(...newArgs))
 						.mapErr((message) => {
 							warnForEvents(definition, message);
 
@@ -83,8 +84,7 @@ namespace Middleware {
 								Type: "Err",
 								Message: message,
 							};
-						})
-						.andWith(() => Result.ok(executeFn(...newArgs)));
+						});
 				})
 				.andWith((returnValue) => {
 					state.ReturnCallbacks.unshift((r) => Serialization.Serialize(seriDef, r as never));
@@ -98,28 +98,26 @@ namespace Middleware {
 									}),
 							  )
 							: Result.ok(unit())
-					).andWith(() =>
-						Result.ok({
-							Type: "Ok",
-							Data: state.ReturnCallbacks.reduce((acc, fn) => fn(acc), returnValue),
-						}),
-					) as never;
+					).map(() => ({
+						Type: "Ok",
+						Data: state.ReturnCallbacks.reduce((acc, fn) => fn(acc), returnValue),
+					})) as never;
 				})
 				.asPtr() as NetBuilderResult<unknown>;
 		};
 	}
 
-	export function CreateSender(
+	export function CreateTransmitter(
 		player: Player,
 		definition: DefinitionMembers,
 		...args: unknown[]
-	): SenderResult {
+	): TransmitterResult {
 		netBuilderDebug(
 			definition,
-			`Created and executed a sender for ${definitionInfo(definition, true)}.`,
+			`Created and executed a transmitter for ${definitionInfo(definition, true)}.`,
 		);
 
-		const state = resolveMiddlewares(player, {
+		const state = processMiddlewares(player, {
 			Definition: definition,
 			Kind: "Send",
 			Arguments: args,
@@ -133,25 +131,21 @@ namespace Middleware {
 
 		return Result.ok(unit())
 			.andWith(() => {
-				return TypeChecking.Parameters(newArgs, parameterChecks, false)
-					.mapErr((message) => {
-						warnForEvents(definition, message);
+				return TypeChecking.Parameters(newArgs, parameterChecks, false).mapErr((message) => {
+					warnForEvents(definition, message);
 
-						return message;
-					})
-					.and(Result.ok(unit()));
+					return message;
+				});
 			})
 			.andWith(() => {
 				state.ReturnCallbacks.unshift((r) => Serialization.Deserialize(seriDef, r as never));
 
 				return state.Result;
 			})
-			.andWith(() =>
-				Result.ok([
-					newArgs,
-					(r: unknown) => state.ReturnCallbacks.reduce((acc, fn) => fn(acc), r),
-				]),
-			) as SenderResult;
+			.map(() => [
+				newArgs,
+				(r: unknown) => state.ReturnCallbacks.reduce((acc, fn) => fn(acc), r),
+			]) as TransmitterResult;
 	}
 
 	function awaitPromiseDeep<T>(promise: T | Promise<T>): T {
@@ -175,10 +169,10 @@ namespace Middleware {
 			.iter();
 	}
 
-	function resolveMiddlewares(player: Player, { Definition, Kind, Arguments }: DefinitionEntry) {
+	function processMiddlewares(player: Player, { Definition, Kind, Arguments }: DefinitionEntry) {
 		netBuilderDebug(
 			Definition,
-			`Started resolving all middlewares from ${definitionInfo(Definition, true)}.`,
+			`Started processing all middlewares from ${definitionInfo(Definition, true)}.`,
 		);
 
 		const middlewares = getMiddlewares(Definition)
@@ -197,7 +191,7 @@ namespace Middleware {
 						)}...`,
 					);
 
-					const result = createChannel(Definition, middleware[Kind])
+					const result = createExecutor(Definition, middleware[Kind])
 						.then(([fn, e]) => {
 							task.spawn(fn, player, ...state.CurrentParameters);
 
@@ -206,13 +200,11 @@ namespace Middleware {
 						.expect();
 
 					return result
-						.andWith<FunctionState>(([newParams, returnFn]) =>
-							Result.ok({
-								CurrentParameters: newParams,
-								ReturnCallbacks: [...state.ReturnCallbacks, returnFn],
-								Result: result,
-							}),
-						)
+						.map<FunctionState>(([newParams, returnFn]) => ({
+							CurrentParameters: newParams,
+							ReturnCallbacks: [...state.ReturnCallbacks, returnFn],
+							Result: result,
+						}))
 						.mapErr<FunctionState>(() => ({
 							...state,
 							Result: result,
@@ -223,15 +215,15 @@ namespace Middleware {
 
 		netBuilderDebug(
 			Definition,
-			`Finished resolving all middlewares from ${definitionInfo(Definition, true)}.`,
+			`Finished processing all middlewares from ${definitionInfo(Definition, true)}.`,
 		);
 
 		return middlewares;
 	}
 
-	function createChannel(definition: DefinitionMembers, channel: MiddlewareCallback<Callback>) {
+	function createExecutor(definition: DefinitionMembers, executor: MiddlewareCallback<Callback>) {
 		return Promise.resolve([
-			coroutine.create(channel),
+			coroutine.create(executor),
 			coroutine.create((result: ThreadResult) => {
 				coroutine.yield();
 
@@ -240,10 +232,10 @@ namespace Middleware {
 			new Instance("BindableEvent"),
 			Promise.delay(Timeout.Middleware).andThenReturn(Middleware.timeoutMsg),
 		] as const)
-			.then(([ch, co, bindable, timeout]) => {
+			.then(([exe, co, bindable, timeout]) => {
 				netBuilderDebug(
 					definition,
-					`Created a middleware resolving channel for ${definitionInfo(definition, true)}.`,
+					`Created a middleware executor for ${definitionInfo(definition, true)}.`,
 				);
 
 				let isDone = false;
@@ -253,7 +245,7 @@ namespace Middleware {
 						isDone = true;
 
 						task.spawn(co, result);
-						task.defer(coroutine.close, ch);
+						task.defer(coroutine.close, exe);
 
 						timeout.cancel();
 						bindable.Fire();
@@ -269,7 +261,7 @@ namespace Middleware {
 				timeout.then((msg) => drop(`${definitionInfo(definition)} ${msg}`));
 
 				return [
-					ch,
+					exe,
 					processNext,
 					drop,
 					Promise.fromEvent(bindable.Event)
@@ -278,9 +270,9 @@ namespace Middleware {
 				] as const;
 			})
 			.then(
-				([ch, p, d, e]) =>
+				([exe, p, d, e]) =>
 					[
-						coroutine.resume(ch, definition, p, d)[1] as ReturnType<
+						coroutine.resume(exe, definition, p, d)[1] as ReturnType<
 							MiddlewareCallback<Callback>
 						>,
 						e as Promise<ThreadResult>,

@@ -153,7 +153,7 @@ Current available fields for configuration are:
 - `SuppressWarnings` - Disables all the warnings emitted from the library.
 - `Logger` - Changes the logger to all of the namespace's definitions.
 - `PreGeneration` - Generates remotes for all the registered definitions, regardless if they are being used or not.
-- `CacheFunctions` - If set to true, functions will always return their latest successful value instead of throwing an error when a middleware fails.
+- `CacheFunctions` - If set to true, functions called via `Call` will always return their latest successful value instead of throwing an error when a middleware fails.
 - `Label` - Changes the warning/error messages text between brackets. e.g: "[netbuilder] Could not find remote instance." **->** "[newtext] Could not find remote instance."
 - `Debug` - Activates debug mode.
 
@@ -335,9 +335,9 @@ After that, the job is complete and our remote is ready to send and receive requ
 
 ```js
 // Something.server.ts
-import { Server } from "shared/Remotes";
+import Definitions from "shared/Remotes";
 
-Server.Introduction.Connect((player, person) => {
+Definitions.Server.Introduction.Connect((player, person) => {
 	person.Introduce();
 
 	if (person.IsUnderage()) {

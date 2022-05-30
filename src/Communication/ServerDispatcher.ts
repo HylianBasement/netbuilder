@@ -20,7 +20,7 @@ import netBuilderDebug from "../Util/netBuilderDebug";
 import netBuilderError from "../Util/netBuilderError";
 import netBuilderWarn from "../Util/netBuilderWarn";
 import promiseYield from "../Util/promiseYield";
-import { IS_RUNNING, IS_SERVER, Timeout } from "../Util/constants";
+import { IS_RUNNING, Timeout } from "../Util/constants";
 
 import Configuration from "../Symbol/Configuration";
 
@@ -28,9 +28,10 @@ type ParametersWithPlayer<F extends Callback> = [player: Player, ...params: Para
 
 const Players = game.GetService("Players");
 
-/** Definition manager responsible for processing server events and functions.
+/**
+ * Definition manager responsible for processing server events and functions.
  */
-class ServerDispatcher<F extends Callback> {
+class ServerSide<F extends Callback> {
 	private readonly remote = OptionMut.none<Remote<F>>();
 
 	private timeout: number;
@@ -38,21 +39,31 @@ class ServerDispatcher<F extends Callback> {
 	private warningTimeout: number;
 
 	public constructor(private readonly definition: DefinitionMembers) {
-		if (!IS_SERVER) {
-			netBuilderError(definition, "This dispatcher can be only created on the server.", 3);
-		}
-
-		const timeout = definition.Timeout;
+		const timeout = (this.timeout = definition.Timeout);
 		const config = definition.Namespace[
 			Configuration as never
 		] as unknown as NetBuilderConfiguration;
 
-		this.timeout = timeout;
 		this.warningTimeout = timeout / 2 >= Timeout.AsyncFunctionMin ? timeout / 2 : math.huge;
 
 		if (config.PreGeneration) {
 			this.getOrCreateRemote();
 		}
+	}
+
+	private _connect(serial: boolean, callback: Callback) {
+		const { definition } = this;
+		const remote = this.getOrCreateRemote();
+
+		if (isRemoteFunction(remote)) {
+			netBuilderError(definition, "Expected ServerEvent, got Function.", 4);
+		}
+
+		netBuilderDebug(definition, `Created a new connection for ${definitionInfo(definition, true)}.`);
+
+		return remote.OnServerEvent[serial ? "Connect" : "ConnectParallel"](
+			Middleware.CreateChannel(definition, callback) as never,
+		);
 	}
 
 	private getOrCreateRemote() {
@@ -101,7 +112,7 @@ class ServerDispatcher<F extends Callback> {
 			);
 		}
 
-		const result = Middleware.CreateSender(player, definition, ...args) as ThreadResult;
+		const result = Middleware.CreateTransmitter(player, definition, ...args) as ThreadResult;
 
 		return result.match(
 			([newArgs, resultFn]) => {
@@ -159,7 +170,7 @@ class ServerDispatcher<F extends Callback> {
 		if (!IS_RUNNING || !assertRemoteType(definition, "RemoteEvent", remote)) return;
 
 		for (const plr of this.resolvePlayerList(player)) {
-			const result = Middleware.CreateSender(plr, definition, ...(args as unknown[]));
+			const result = Middleware.CreateTransmitter(plr, definition, ...(args as unknown[]));
 
 			if (result.isOk()) {
 				netBuilderDebug(
@@ -201,19 +212,18 @@ class ServerDispatcher<F extends Callback> {
 
 	/** Connects a listener callback that is called whenever new data is received from a client. */
 	public Connect(callback: (player: Player, ...args: Parameters<F>) => void | Promise<void>) {
-		const { definition } = this;
-		const remote = this.getOrCreateRemote();
-
-		if (isRemoteFunction(remote)) {
-			netBuilderError(definition, "Expected ServerEvent, got Function.", 3);
-		}
-
-		netBuilderDebug(definition, `Created a new connection for ${definitionInfo(definition, true)}.`);
-
-		return remote.OnServerEvent.Connect(Middleware.CreateReceiver(definition, callback) as never);
+		return this._connect(true, callback);
 	}
 
-	/** Yields the current thread until the a request is sent. Returns what was fired to the signal. */
+	/**
+	 * Connects a listener callback that is ran in parallel whenever new data is received from a client,
+	 * which is more efficient than using `Connect` + `task.desynchronize`.
+	 */
+	public ConnectParallel(callback: (player: Player, ...args: Parameters<F>) => void) {
+		return this._connect(false, callback);
+	}
+
+	/** Yields the current thread until a request is sent. Returns what was fired to the signal. */
 	public Wait() {
 		const remote = this.getOrCreateRemote();
 		const { definition } = this;
@@ -232,7 +242,7 @@ class ServerDispatcher<F extends Callback> {
 		).expect() as LuaTuple<ParametersWithPlayer<F>>;
 	}
 
-	/** Connects a callback that returns back asynchronous only data to the server. */
+	/** Sets the callback that returns back asynchronous only data to the server. */
 	public SetCallback(
 		callback: (
 			player: Player,
@@ -248,11 +258,11 @@ class ServerDispatcher<F extends Callback> {
 
 		netBuilderDebug(definition, `A callback was set for ${definitionInfo(definition, true)}.`);
 
-		remote.OnServerInvoke = Middleware.CreateReceiver(this.definition, callback);
+		remote.OnServerInvoke = Middleware.CreateChannel(this.definition, callback);
 	}
 }
 
-(ServerDispatcher as LuaMetatable<ServerDispatcher<Callback>>).__call = (Self, ...a) => {
+(ServerSide as LuaMetatable<ServerSide<Callback>>).__call = (Self, ...a) => {
 	const args = [...a];
 	const def = Self["definition"];
 	const kind = def.Kind;
@@ -270,4 +280,4 @@ class ServerDispatcher<F extends Callback> {
 	netBuilderError(def, "Direct calls are not supported for Functions.");
 };
 
-export = ServerDispatcher;
+export = ServerSide;

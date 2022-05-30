@@ -19,6 +19,7 @@ interface RateLimiterError {
 	readonly Requests: number;
 	readonly Definition: LoggingDefinition;
 }
+
 interface RateLimiterProperties {
 	Requests: number;
 	LastTimestamp: DateTime;
@@ -26,7 +27,10 @@ interface RateLimiterProperties {
 
 const Players = game.GetService("Players");
 
-/** Limits the amount of requests that can be sent every x amount of seconds. */
+/**
+ * Limits the amount of requests that can be sent every x amount of seconds.
+ * Defaults to 1 minute.
+ */
 const RateLimiter = NetBuilder.CreateMiddleware<[options: RateLimiterOptions]>(
 	"RateLimiter",
 	(options) => {

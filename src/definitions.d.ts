@@ -1,7 +1,7 @@
 import { Result } from "@rbxts/rust-classes";
 
-import ClientDispatcher from "./Communication/ClientDispatcher";
-import ServerDispatcher from "./Communication/ServerDispatcher";
+import ClientSide from "./Communication/ClientDispatcher";
+import ServerSide from "./Communication/ServerDispatcher";
 
 export type ArrayLength<T extends Array<any> | ReadonlyArray<any>> = (T & { length: number })["length"];
 
@@ -10,22 +10,20 @@ export type LengthEquals<
 	B extends Array<any> | ReadonlyArray<any>,
 > = ArrayLength<A> extends ArrayLength<B> ? true : false;
 
+/** Checks if `value` is a T.  */
 export type Check<T> = (value: unknown) => value is T;
 
+/** Creates a static type from a t-defined type.  */
 export type Static<T> = T extends Check<infer U> ? U : never;
 
 export type ThreadResult = Result<[Array<unknown>, (r: unknown) => unknown], string>;
 
-export type ToFixed<T extends Array<any>, U extends Array<any> = []> = LengthEquals<T, U> extends true
-	? U
-	: ToFixed<T, [...U, T[ArrayLength<U>]]>;
-
-export type InferStrictArguments<
+export type InferArguments<
 	Checks extends Array<Check<any>>,
-	New extends Array<any> = [],
-> = LengthEquals<Checks, New> extends true
-	? New
-	: InferStrictArguments<Checks, [...New, Static<Checks[ArrayLength<New>]>]>;
+	Args extends Array<any> = [],
+> = LengthEquals<Checks, Args> extends true
+	? Args
+	: InferArguments<Checks, [...Args, Static<Checks[ArrayLength<Args>]>]>;
 
 export type UnwrapAsyncReturnType<T extends Callback> = ReturnType<T> extends Promise<infer U>
 	? U extends Promise<any>
@@ -112,13 +110,24 @@ export interface NetBuilderLogger {
 }
 
 export interface NetBuilderConfiguration {
+	/** Changes the default name of the root directory. */
 	RootName?: string;
+	/** Changes the location of the remote instances main directory. */
 	RootInstance?: Instance;
+	/** Changes the logger to all of the namespace's definitions. */
 	Logger?: NetBuilderLogger;
+	/**
+	 * Changes the warning/error messages text between brackets.
+	 * e.g: `[netbuilder] Could not find remote instance.` -> `[newtext] Could not find remote instance.`
+	 */
 	Label: string;
+	/** Activates debug mode. */
 	Debug: boolean;
+	/** Disables all the warnings emitted from the library. */
 	SuppressWarnings: boolean;
+	/** Generates remotes for all the registered definitions, regardless if they are being used or not. */
 	PreGeneration: boolean;
+	/** If set to true, functions called via `Call` will always return their latest successful value instead of throwing an error when a middleware fails. */
 	CacheFunctions: boolean;
 }
 
@@ -133,7 +142,7 @@ export type NetBuilderMiddleware<F extends Callback = Callback> = ObjectDispatch
 
 /** Callback that is executed on a middleware check. */
 export type MiddlewareCallback<F extends Callback> = (
-	definition: DefinitionMembers,
+	definition: LoggingDefinition,
 	process: (params: Parameters<F>, returnValue?: (value: ReturnType<F>) => unknown) => never,
 	drop: (reason: string) => never,
 ) => (player: Player, ...params: Parameters<F>) => void;
@@ -153,12 +162,24 @@ export interface Definition<
 	readonly _nominal_remoteDefinition: unique symbol;
 }
 
-export interface DefinitionMembers {
+/** Definition type variant for logging related operations. */
+export interface LoggingDefinition {
+	/** The identifier that the definition is bound to. */
 	readonly Id: string;
+	/** The kind of the definition. i.e: `Event`, `Function`, `AsyncFunction` */
 	readonly Kind: DefinitionKind;
+}
+
+/** Definition type variant for serialization related operations. */
+export interface SerializationDefinition extends LoggingDefinition {
+	/** Reference to the definition's namespace. */
+	readonly Namespace: DefinitionNamespace;
+}
+
+/** Definition type variant for internal use. */
+export interface DefinitionMembers extends LoggingDefinition, SerializationDefinition {
 	readonly Middlewares: ReadonlyArray<NetBuilderMiddleware>;
 	readonly Checks: readonly [ReadonlyArray<Check<any>>, Check<any>];
-	readonly Namespace: DefinitionNamespace;
 	readonly Timeout: number;
 }
 
@@ -171,43 +192,78 @@ export interface BuilderMembers {
 	kind: DefinitionKind;
 }
 
-/** Definition variant for logging related operations. */
-export interface LoggingDefinition {
-	readonly Id: string;
-	readonly Kind: DefinitionKind;
-}
-
-/** Definition variant for serialization related operations. */
-export interface SerializationDefinition extends LoggingDefinition {
-	readonly Namespace: DefinitionNamespace;
-}
-
-export type ClientDefinition<K extends DefinitionKind, D> = D extends ClientDispatcher<any>
+export type ClientDefinition<K extends DefinitionKind, D> = D extends ClientSide<any>
 	? K extends "Event"
-		? { (this: void, ...args: Parameters<D["Send"]>): void } & Omit<
-				D,
-				"SetCallback" | "Call" | "CallAsync" | "RawCall" | "CallWith"
-		  >
+		? Event<D>
 		: K extends "Function"
-		? { (this: void, ...args: Parameters<D["Call"]>): ReturnType<D["Call"]> } & Omit<
-				D,
-				"Connect" | "Wait" | "CallAsync" | "Send"
-		  >
-		: { (this: void, ...args: Parameters<D["CallAsync"]>): ReturnType<D["CallAsync"]> } & Omit<
-				D,
-				"Connect" | "Wait" | "Call" | "RawCall" | "CallWith" | "Send"
-		  >
+		? Function<D>
+		: AsyncFunction<D>
 	: never;
 
-export type ServerDefinition<K extends DefinitionKind, D> = D extends ServerDispatcher<any>
+export type ServerDefinition<K extends DefinitionKind, D> = D extends ServerSide<any>
 	? K extends "Event"
-		? { (this: void, ...args: Parameters<D["Send"]>): void } & Omit<D, "SetCallback" | "CallAsync">
+		? Event<D>
 		: K extends "Function"
-		? Omit<D, "Connect" | "Wait" | "CallAsync" | "Send" | "SendToAll" | "SendWithout">
-		: { (this: void, ...args: Parameters<D["CallAsync"]>): ReturnType<D["CallAsync"]> } & Omit<
-				D,
-				"Connect" | "Wait" | "Send" | "SendToAll" | "SendWithout"
-		  >
+		? Function<D>
+		: AsyncFunction<D>
+	: never;
+
+type ServerEvent<D extends ServerSide<any>> = {
+	(this: void, ...args: Parameters<D["Send"]>): void;
+} & Omit<D, "SetCallback" | "CallAsync">;
+
+type ServerFunction<D extends ServerSide<any>> = {
+	/** @hidden @deprecated */
+	readonly _nominal_serverFunction: unique symbol;
+} & Omit<D, "Connect" | "ConnectParallel" | "Wait" | "CallAsync" | "Send" | "SendToAll" | "SendWithout">;
+
+type ServerAsyncFunction<D extends ServerSide<any>> = {
+	(this: void, ...args: Parameters<D["CallAsync"]>): NetBuilderAsyncReturn<
+		ReturnType<InferDispatcherCallback<D>>
+	>;
+} & Omit<D, "Connect" | "ConnectParallel" | "Wait" | "Send" | "SendToAll" | "SendWithout">;
+
+type ClientEvent<D extends ClientSide<any>> = {
+	(this: void, ...args: Parameters<D["Send"]>): void;
+} & Omit<D, "SetCallback" | "Call" | "CallAsync" | "RawCall" | "CallWith">;
+
+type ClientFunction<D extends ClientSide<any>> = {
+	(this: void, ...args: Parameters<D["Call"]>): ReturnType<InferDispatcherCallback<D>>;
+} & Omit<D, "Connect" | "ConnectParallel" | "Wait" | "CallAsync" | "Send">;
+
+type ClientAsyncFunction<D extends ClientSide<any>> = {
+	(this: void, ...args: Parameters<D["CallAsync"]>): NetBuilderAsyncReturn<
+		ReturnType<InferDispatcherCallback<D>>
+	>;
+} & Omit<D, "Connect" | "ConnectParallel" | "Wait" | "Call" | "RawCall" | "CallWith" | "Send">;
+
+type Event<D> = {
+	/** @hidden @deprecated */
+	readonly _nominal_event: unique symbol;
+} & (D extends ServerSide<any> ? ServerEvent<D> : D extends ClientSide<any> ? ClientEvent<D> : never);
+
+type Function<D> = {
+	/** @hidden @deprecated */
+	readonly _nominal_function: unique symbol;
+} & (D extends ServerSide<any>
+	? ServerFunction<D>
+	: D extends ClientSide<any>
+	? ClientFunction<D>
+	: never);
+
+type AsyncFunction<D> = {
+	/** @hidden @deprecated */
+	readonly _nominal_asyncFunction: unique symbol;
+} & (D extends ServerSide<any>
+	? ServerAsyncFunction<D>
+	: D extends ClientSide<any>
+	? ClientAsyncFunction<D>
+	: never);
+
+type InferDispatcherCallback<D> = D extends ServerSide<infer F>
+	? F
+	: D extends ClientSide<infer F>
+	? F
 	: never;
 
 export type InferDefinitionId<R> = R extends Definition<infer I, never, never> ? I : never;

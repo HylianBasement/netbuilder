@@ -1,6 +1,6 @@
-import Definitions from "shared/Definitions";
+import { Server } from "shared/Definitions";
 
-Definitions.Server.People.VerifyAge.SetCallback((_player, person) => {
+Server.People.VerifyAge.SetCallback((_player, person) => {
 	person.Introduce();
 
 	if (person.IsUnderage()) {
@@ -12,4 +12,4 @@ Definitions.Server.People.VerifyAge.SetCallback((_player, person) => {
 
 task.wait(3);
 
-Definitions.Server.PrintOnClient.SendToAll("hi");
+Server.PrintOnClient.SendToAll("hi");

@@ -44,7 +44,7 @@ const enum Boundary {
 }
 
 type NetBuilderServer<R extends DefinitionNamespace> = {
-	[I in keyof R]: R[I] extends Definition
+	readonly [I in keyof R]: R[I] extends Definition
 		? ServerDefinition<InferDefinitionKind<R[I]>, ServerDispatcher<InferDefinitionTyping<R[I]>>>
 		: R[I] extends DefinitionNamespace
 		? NetBuilderServer<R[I]>
@@ -52,7 +52,7 @@ type NetBuilderServer<R extends DefinitionNamespace> = {
 };
 
 type NetBuilderClient<R extends DefinitionNamespace> = {
-	[I in keyof R]: R[I] extends Definition
+	readonly [I in keyof R]: R[I] extends Definition
 		? ClientDefinition<InferDefinitionKind<R[I]>, ClientDispatcher<InferDefinitionTyping<R[I]>>>
 		: R[I] extends DefinitionNamespace
 		? NetBuilderClient<R[I]>
@@ -60,15 +60,21 @@ type NetBuilderClient<R extends DefinitionNamespace> = {
 };
 
 type NetBuilderMiddlewareOptions = {
+	/** Enables the middleware to be used globally. */
 	Global?: boolean;
+	/** Checks whether the middleware will be executed on the server or both. */
+	ServerOnly: boolean;
 } & (
 	| {
 			ServerOnly: false;
+			/** Middleware callback that is executed before a request is sent. */
 			Sender?: MiddlewareCallback<Callback>;
+			/** Middleware callback that is executed when a request is received. */
 			Receiver?: MiddlewareCallback<Callback>;
 	  }
 	| {
 			ServerOnly: true;
+			/** Middleware callback that behaves like a sender/receiver. */
 			Callback: MiddlewareCallback<Callback>;
 	  }
 );
@@ -205,9 +211,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 				}
 			}
 
-			table.freeze(output);
-
-			return output;
+			return table.freeze(output);
 		}
 
 		return assign(dict, {});
@@ -217,25 +221,26 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 	public BindDefinition<D extends Definition>(definition: D) {
 		this.definitions.push(definition);
 
-		return this as unknown as NetBuilder<
-			Reconstruct<R & { readonly [_ in InferDefinitionId<D>]: D }>,
-			O
-		>;
+		return this as unknown as NetBuilder<Reconstruct<R & { [_ in InferDefinitionId<D>]: D }>, O>;
 	}
 
 	/** Binds a child definition namespace. */
 	public BindNamespace<S extends string, N extends DefinitionNamespace>(name: S, space: N) {
 		this.namespaces.push({ name, space });
 
-		return this as unknown as NetBuilder<Reconstruct<R & { readonly [_ in S]: N }>, O>;
+		return this as unknown as NetBuilder<Reconstruct<R & { [_ in S]: N }>, O>;
 	}
 
 	public Configure(
 		config: ((builder: ConfigurationBuilder) => object) | Partial<NetBuilderConfiguration>,
 	) {
-		this.configuration = typeIs(config, "function")
-			? (config(new ConfigurationBuilder()) as ConfigurationBuilder)["Build"]()
-			: { ...this.configuration, ...config };
+		if (typeIs(config, "function")) {
+			this.configuration = (config(new ConfigurationBuilder()) as ConfigurationBuilder)["Build"]();
+		} else {
+			for (const [k, v] of pairs(config)) {
+				this.configuration[k] = v as never;
+			}
+		}
 
 		return this as unknown as NetBuilder<R, O>;
 	}
@@ -288,9 +293,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 			const def = d as unknown as DefinitionMembers;
 			(def.Namespace as unknown) = dict;
 
-			table.freeze(d);
-
-			dict.set(def.Id, d);
+			dict.set(def.Id, table.freeze(d));
 		}
 
 		for (const { name, space } of namespaces) {
@@ -302,9 +305,7 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 				? { ...this.configuration, ...(s[Configuration] as NetBuilderConfiguration) }
 				: this.configuration;
 
-			table.freeze(space);
-
-			dict.set(name, space);
+			dict.set(name, table.freeze(space));
 		}
 
 		const thisNamespace = symbolDictionary(dict);
@@ -326,7 +327,8 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 	public Build() {
 		const { cache } = this;
 		const definitions = this._build();
-		const remotes = {
+
+		return table.freeze({
 			/**
 			 * Generated server definitions
 			 * @server
@@ -337,11 +339,11 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 					__tostring: () => "NetBuilder.ServerDefinitions",
 					__index: (_, key) => {
 						if (!IS_SERVER) {
-							error("[netbuilder] Cannot access server definitions from a client.");
+							throw "[netbuilder] Cannot access server definitions from a client.";
 						}
 
 						return cache.Server.getOrInsertWith(
-							() => this.createDispatchers(Boundary.Server, definitions) as never,
+							() => this.createDispatchers(Boundary.Server, definitions) as R,
 						)[key as keyof R];
 					},
 				},
@@ -356,20 +358,16 @@ class NetBuilder<R extends DefinitionNamespace = {}, O extends keyof NetBuilder 
 					__tostring: () => "NetBuilder.ClientDefinitions",
 					__index: (_, key) => {
 						if (!IS_CLIENT) {
-							error("[netbuilder] Cannot access client definitions from the server.");
+							throw "[netbuilder] Cannot access client definitions from the server.";
 						}
 
 						return cache.Client.getOrInsertWith(
-							() => this.createDispatchers(Boundary.Client, definitions) as never,
+							() => this.createDispatchers(Boundary.Client, definitions) as R,
 						)[key as keyof R];
 					},
 				},
 			) as NetBuilderClient<R>,
-		} as const;
-
-		table.freeze(remotes);
-
-		return remotes;
+		});
 	}
 }
 

@@ -1,15 +1,13 @@
-import Definitions from "shared/Definitions";
+import { Client } from "shared/Definitions";
 import Person from "shared/Class/Person";
 
-const [message] = Definitions.Client.PrintOnClient.Wait();
+const [message] = Client.PrintOnClient.Wait();
 print("Server says: " + message);
 
 const john = new Person("John Doe", 6);
 
 // Fourth time is supposed to throw because of the rate limiter middleware we registered.
 for (let i = 0; i < 4; i++) {
-	print(
-		Definitions.Client.People.VerifyAge(john) ? "John is still underage." : "John is now an adult!",
-	);
+	print(Client.People.VerifyAge(john) ? "John is still underage." : "John is now an adult!");
 	john.IncrementAge(6);
 }
