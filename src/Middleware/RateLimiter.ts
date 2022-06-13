@@ -22,7 +22,7 @@ interface RateLimiterError {
 
 interface RateLimiterProperties {
 	Requests: number;
-	LastTimestamp: DateTime;
+	LastTimestamp: number;
 }
 
 const Players = game.GetService("Players");
@@ -49,16 +49,16 @@ const RateLimiter = NetBuilder.CreateMiddleware<[options: RateLimiterOptions]>(
 					const { Requests } = players
 						.entry(tostring(player.UserId))
 						.andModify((props) => {
-							const now = DateTime.now();
+							const now = DateTime.now().UnixTimestamp;
 
-							if (now.UnixTimestamp - props.LastTimestamp.UnixTimestamp >= timeout) {
+							if (now - props.LastTimestamp >= timeout) {
 								props.Requests = 0;
 								props.LastTimestamp = now;
 							}
 
 							props.Requests++;
 						})
-						.orInsert({ Requests: 1, LastTimestamp: DateTime.now() });
+						.orInsert({ Requests: 1, LastTimestamp: DateTime.now().UnixTimestamp });
 
 					if (Requests > Max) {
 						const message = `Exceeded the limit of ${Max} requests every ${timeout}s for ${definitionInfo(

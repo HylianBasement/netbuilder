@@ -14,11 +14,9 @@ namespace Validation {
 			return Result.ok(unit());
 		}
 
-		const valueType = type(value);
+		const entries = validationMap.get(type(value));
 
-		if (validationMap.has(valueType)) {
-			const entries = validationMap.get(valueType)!;
-
+		if (entries) {
 			for (const { Validator, Message } of entries) {
 				if (Validator(value) === false) {
 					return Result.err(Message);
@@ -38,7 +36,7 @@ namespace Validation {
 			"function",
 			[
 				{
-					Message: "Functions cannot be replicated across server and client.",
+					Message: "Functions cannot be passed.",
 					Validator: fails,
 				},
 			],
@@ -47,7 +45,7 @@ namespace Validation {
 			"thread",
 			[
 				{
-					Message: "Threads cannot be replicated across server and client.",
+					Message: "Threads cannot be passed.",
 					Validator: fails,
 				},
 			],
@@ -58,12 +56,27 @@ namespace Validation {
 				// Metatables
 				{
 					Message:
-						"Please, consider serializing your tables before sending them across server and client.",
+						"Please, consider serializing your metatables before sending them across server and client.",
 					Validator: (tbl: object) => getmetatable(tbl) === undefined,
+				},
+				// Non-String Indices
+				{
+					Message:
+						"Tables with non-string indices cannot be sent because those indices would be converted to a string.",
+					Validator: (tbl: Map<defined, unknown>) => {
+						for (const [k] of tbl) {
+							if (type(k) !== "number" && type(k) !== "string") {
+								return false;
+							}
+						}
+
+						return true;
+					},
 				},
 				// Mixed tables
 				{
-					Message: "Replicating mixed tables across server and client is not supported.",
+					Message:
+						"Mixed tables cannot be sent, as only the data indexed by number will be passed.",
 					Validator: (tbl: Map<defined, unknown>) => {
 						const keyTypes = new Set<keyof CheckablePrimitives>();
 
